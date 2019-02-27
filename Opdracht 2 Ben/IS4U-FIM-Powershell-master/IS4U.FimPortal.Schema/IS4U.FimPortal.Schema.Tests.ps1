@@ -1,8 +1,8 @@
 ﻿Import-Module IS4U.FimPortal.Schema
 
 Class NewFimImportObject {
-    [string]$Object
-    [string]$State
+    [string]$ObjectType = "AttributeTypeDescription"
+    [string]$State = "Create"
     [Hashtable]$Changes
     [ImportObject]$ImportObject = [ImportObject]::new()
 }
@@ -30,12 +30,24 @@ Describe "New-Attribute" {
 
             $result | Should be 1
         }
+
+        It "New-FimImportObject get called" {
+            $newFimImpObj = [NewFimImportObject]::new()
+            #$newFimImpObj.ImportObject.TargetObjectIdentifier = 1
+            #$newFimImpObj.ImportObject.SourceObjectIdentifier = 5
+            New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
+            Mock New-FimImportObject {$newFimImpObj}
+            # is dit ok?
+            New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
+            Assert-MockCalled -CommandName New-FimImportObject
+        }
         
         It "Parameters get saved into object (Name, DisplayName, Type (mandatory), Description, MultiValued (Optional)" {
-            $newFimObj = [NewFimImportObject]::new()
-            Mock New-FimImportObject { $newFimObj }
-            Mock New-Attribute -MockWith { $NewFimObj[$changes] }
-            $result = New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
+            $newFimImpObj = [NewFimImportObject]::new()
+            Mock New-FimImportObject { $newFimImpObj }
+            New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
+            New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
+            $result = $changes
             Write-Host($result)
             $result -eq @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"} | Should be $true
         }
