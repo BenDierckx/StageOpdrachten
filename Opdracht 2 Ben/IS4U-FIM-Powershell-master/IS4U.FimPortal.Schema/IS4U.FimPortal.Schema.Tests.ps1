@@ -3,11 +3,11 @@
 Class NewFimImportObject {
     [string]$ObjectType #= "AttributeTypeDescription"
     [string]$State #= "Create"
-    [Hashtable]$Changes = @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"; "MultiValued" = "False"}
+    [Hashtable]$Changes = @{}
     #[ImportObject]$ImportObject = [ImportObject]::new()
     NewFimImportObject($objectType, $State, $changes) {
         $this.ObjectType = $objectType
-        $this.State = $State
+        $this.State = $state
         $this.Changes = $changes
     }
 }
@@ -41,9 +41,8 @@ Describe "New-Attribute" {
             $newFimImpObj = [NewFimImportObject]::new("AttributeTypeDescription", "Create", $changes)
             #$newFimImpObj.ImportObject.TargetObjectIdentifier = 1
             #$newFimImpObj.ImportObject.SourceObjectIdentifier = 5
-            New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
             Mock New-FimImportObject {return $newFimImpObj}
-            # is dit ok?
+            New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
             New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
             Assert-MockCalled -CommandName New-FimImportObject
         }
@@ -54,7 +53,7 @@ Describe "New-Attribute" {
             Mock New-FimImportObject { return $newFimImpObj }
             $result = New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
             Write-Host($result)
-            $result.Changes -eq @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"} | Should be $true
+            $changes -eq @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"} | Should be $true
         }
     }
 
