@@ -1,10 +1,15 @@
 ﻿Import-Module IS4U.FimPortal.Schema
 
 Class NewFimImportObject {
-    [string]$ObjectType = "AttributeTypeDescription"
-    [string]$State = "Create"
-    [Hashtable]$Changes
-    [ImportObject]$ImportObject = [ImportObject]::new()
+    [string]$ObjectType #= "AttributeTypeDescription"
+    [string]$State #= "Create"
+    [Hashtable]$Changes = @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"; "MultiValued" = "False"}
+    #[ImportObject]$ImportObject = [ImportObject]::new()
+    NewFimImportObject($objectType, $State, $changes) {
+        $this.ObjectType = $objectType
+        $this.State = $State
+        $this.Changes = $changes
+    }
 }
 
 Class ImportObject {
@@ -32,24 +37,24 @@ Describe "New-Attribute" {
         }
 
         It "New-FimImportObject get called" {
-            $newFimImpObj = [NewFimImportObject]::new()
+            $changes = @{}
+            $newFimImpObj = [NewFimImportObject]::new("AttributeTypeDescription", "Create", $changes)
             #$newFimImpObj.ImportObject.TargetObjectIdentifier = 1
             #$newFimImpObj.ImportObject.SourceObjectIdentifier = 5
             New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
-            Mock New-FimImportObject {$newFimImpObj}
+            Mock New-FimImportObject {return $newFimImpObj}
             # is dit ok?
             New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
             Assert-MockCalled -CommandName New-FimImportObject
         }
         
         It "Parameters get saved into object (Name, DisplayName, Type (mandatory), Description, MultiValued (Optional)" {
-            $newFimImpObj = [NewFimImportObject]::new()
-            Mock New-FimImportObject { $newFimImpObj }
-            New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
-            New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
-            $result = $changes
+            $changes = @{}
+            $newFimImpObj = [NewFimImportObject]::new("AttributeTypeDescription", "Create", $changes)
+            Mock New-FimImportObject { return $newFimImpObj }
+            $result = New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
             Write-Host($result)
-            $result -eq @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"} | Should be $true
+            $result.Changes -eq @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"} | Should be $true
         }
     }
 

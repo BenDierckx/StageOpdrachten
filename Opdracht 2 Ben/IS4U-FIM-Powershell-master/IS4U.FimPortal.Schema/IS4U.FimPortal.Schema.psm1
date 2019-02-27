@@ -55,8 +55,9 @@ Function New-Attribute {
 	$changes.Add("DataType", $Type)
 	$changes.Add("Multivalued", $MultiValued)
 	$attr = New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
-	[UniqueIdentifier] $id = $attr.TargetObjectIdentifier
-	return $id
+	#[UniqueIdentifier] $id = $attr.TargetObjectIdentifier
+	#return $id
+    return $attr
 }
 
 Function Update-Attribute {
