@@ -1,6 +1,15 @@
 ﻿Import-Module IS4U.FimPortal.Schema
 
+Class NewFimImportObject {
+    [string]$Object
+    [string]$State
+    [Hashtable]$Changes
+    [ImportObject]$ImportObject = [ImportObject]::new()
+}
+
 Class ImportObject {
+    [string]$SourceObjectIdentifier
+    [string]$TargetObjectIdentifier
     [string]$ObjectType
     [string]$State
     [Hashtable]$Changes
@@ -23,9 +32,12 @@ Describe "New-Attribute" {
         }
         
         It "Parameters get saved into object (Name, DisplayName, Type (mandatory), Description, MultiValued (Optional)" {
-            Mock New-Attribute -MockWith {return 2}
+            $newFimObj = [NewFimImportObject]::new()
+            Mock New-FimImportObject { $newFimObj }
+            Mock New-Attribute -MockWith { $NewFimObj[$changes] }
             $result = New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
-            New-Attribute $changes{} | Should MatchHashtable @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"}
+            Write-Host($result)
+            $result -eq @{"Name" = "Visa"; "DisplayName" = "Visa"; "Type" = "String"} | Should be $true
         }
     }
 
