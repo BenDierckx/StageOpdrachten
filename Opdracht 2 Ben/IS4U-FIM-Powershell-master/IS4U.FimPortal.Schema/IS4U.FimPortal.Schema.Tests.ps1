@@ -76,3 +76,33 @@ Describe "Remove-Attribute" {
         }
     }
 }
+
+Describe "New-Binding" {
+    Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $ObjectType, $AttributeName, $AttributeValue
+    }
+    $fimImport = [NewFimImportObject]::new()
+    Mock New-FimImportObject { $fimImport } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $ObjectType, $State, $anchor, $changes, $ApplyNow, $SkipDuplicateCheck, $PassThru
+    }
+
+    $result = New-Binding -AttributeName "Visa" -DisplayName "Visa card number" -Description "Visum" -Required "Required" -ObjectType "Person"
+
+    Context "New-Binding with parameters" {
+        
+        It "AttrId sends correct parameters" {
+            Write-Host($result)
+            Assert-MockCalled New-FimImportObject -ParameterFilter{
+                $changes["Required"] -eq "Required" -and $changes["DisplayName"] -eq "Visa card number" -and $changes["Description"] -eq "Visum" -and $changes["BoundAttributeType"] -eq "attrId" -and $changes["BoundObjectType"] -eq "objId"
+            } -ModuleName "IS4U.FimPortal.Schema"
+        }
+
+        It "ObjId sends correct parameters" {
+            
+        }
+
+        It "AttrId and ObjId gets Id from Get-FimObjectID" {
+            
+        }
+    }
+}
