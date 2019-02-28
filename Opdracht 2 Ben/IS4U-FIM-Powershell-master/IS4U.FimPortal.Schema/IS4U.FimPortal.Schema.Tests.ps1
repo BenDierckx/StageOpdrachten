@@ -11,14 +11,6 @@ Class NewFimImportObject {
     }#>
 }
 
-<#Class ImportObject {
-    [string]$SourceObjectIdentifier
-    [string]$TargetObjectIdentifier
-    [string]$ObjectType
-    [string]$State
-    [Hashtable]$Changes
-}#>
-
 Describe "New-Attribute" {
     
     Context "Module Setup" {
@@ -33,7 +25,6 @@ Describe "New-Attribute" {
         $result = New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
 
         It "New-FimImportObject get called" {
-            #New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
             Assert-MockCalled -CommandName New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
         }
         
@@ -45,7 +36,8 @@ Describe "New-Attribute" {
         }
 
         It "Return correct object" {
-            Write-Host($result)
+            Write-Host($result[2].Values)
+            $result[0] -eq "AttributeTypeDescription" -and $result[1] -eq "Create" -and $result[2]["Name"] -eq "Visa" | Should be $true
         }
     }
 
