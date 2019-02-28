@@ -36,3 +36,43 @@ Describe "New-Attribute" {
         }
     }
 }
+
+Describe "Update-Attribute" {
+    Context "With parameters (mandatory)" {
+        $fimImport = [NewFimImportObject]::new()
+        Mock New-FimImportObject { $fimImport } -ModuleName "IS4U.FimPortal.Schema" -MockWith {$ObjectType, $State, $anchor, $changes, $ApplyNow}
+        #[GUID]$Id = "66b7d725-8226-4ccd-99ad-3540c44c49b6"
+        Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
+        $result = Update-Attribute -Name Visum -DisplayName Visum -Description "Update test"
+        It "Module file is ready to be loaded" {
+            Get-Module -ListAvailable | Where {$_.Name -eq 'IS4U.FimPortal.Schema'}
+        }
+
+        It "Parameters get saved into object (Name, DisplayName, Description)" {
+            Assert-MockCalled New-FimImportObject -ParameterFilter {
+                # To-Do anchor in place of $result[2]
+                $ObjectType -eq "AttributeTypeDescription" -and $State -eq "Put" -and $changes["DisplayName"] -eq "Visum" -and $result[2].Values -eq "Visum"
+            } -ModuleName "IS4U.FimPortal.Schema"
+        }
+
+        It "Variable id gets filled and Update-Attribute returns a Guid" {
+            $result | Should Not BeNullOrEmpty
+            $result[5].GetType() -eq [GUID]
+        }
+    }
+}
+
+Describe "Remove-Attribute" {
+    Context "With parameter Name" {
+        Mock Remove-FimObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+            $AnchorName, $AnchorValue, $ObjectType
+        }
+        Remove-Attribute -Name "Visa"
+
+        It "Correct parameters go to Remove-FimObject" {
+            Assert-MockCalled Remove-FimObject -ParameterFilter {
+                $AnchorName -eq "Name" -and $AnchorValue -eq "Visa" -and $ObjectType -eq "AttributeTypeDescription"
+            } -ModuleName "IS4U.FimPortal.Schema"
+        }
+    }
+}
