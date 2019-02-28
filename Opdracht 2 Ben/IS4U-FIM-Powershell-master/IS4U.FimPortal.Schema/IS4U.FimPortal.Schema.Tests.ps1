@@ -4,11 +4,6 @@ Class NewFimImportObject {
     [string]$ObjectType #= "AttributeTypeDescription"
     [string]$State #= "Create"
     [Hashtable]$Changes = @{}
-    <#NewFimImportObject($objectType, $state, $changes) {
-        $this.ObjectType = $objectType
-        $this.State = $state
-        $this.Changes = $changes
-    }#>
 }
 
 Describe "New-Attribute" {
@@ -40,13 +35,4 @@ Describe "New-Attribute" {
             $result[0] -eq "AttributeTypeDescription" -and $result[1] -eq "Create" -and $result[2]["Name"] -eq "Visa" | Should be $true
         }
     }
-
-    <#Context "with parameters (mandatory)" {
-        Mock New-Atrribute {return 1}
-        $result = New-Attribute -Name Visa -DisplayName Visa -Type String
-            It "Name should be 'Visa'" {
-                $actionResult = Get-Variable -Name $changes.Name
-                $actionResult | should be "Visa"
-            }
-    }#>
 }
