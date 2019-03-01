@@ -275,8 +275,7 @@ Function New-AttributeAndBinding {
 		$ObjectType = "Person"
 	)
 
-	#[UniqueIdentifier] $attrId = New-Attribute -Name $Name -DisplayName $DisplayName -Type $Type -MultiValued $MultiValued
-    [GUID] $attrId = New-Attribute -Name $Name -DisplayName $DisplayName -Type $Type -MultiValued $MultiValued
+	[UniqueIdentifier] $attrId = New-Attribute -Name $Name -DisplayName $DisplayName -Type $Type -MultiValued $MultiValued
 	New-Binding -AttributeName $Name -DisplayName $DisplayName -ObjectType $ObjectType
 	if($ObjectType -eq "Person") {
 		Add-AttributeToMPR -AttrName $Name -MprName "Administration: Administrators can read and update Users"
