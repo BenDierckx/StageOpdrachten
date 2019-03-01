@@ -156,8 +156,9 @@ Function New-Binding {
 	$changes.Add("BoundAttributeType", $attrId)
 	$changes.Add("BoundObjectType", $objId)
 	$binding = New-FimImportObject -ObjectType BindingDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
-	[UniqueIdentifier] $id = $binding.TargetObjectIdentifier
-	return $id
+	#[UniqueIdentifier] $id = $binding.TargetObjectIdentifier
+	#return $id
+    return $binding
 }
 
 Function Update-Binding {
@@ -198,14 +199,17 @@ Function Update-Binding {
 	$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
 	$objId = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
 	$binding = Get-FimObject -Filter "/BindingDescription[BoundAttributeType='$attrId' and BoundObjectType='$objId']"
-	[UniqueIdentifier] $id = $binding.ObjectID
-	$anchor = @{"ObjectID" = $id.Value}
+	#[UniqueIdentifier] $id = $binding.ObjectID
+    $id = $binding
+	#$anchor = @{"ObjectID" = $id.Value}
+    $anchor = @{"ObjectID" = $id}
 	$changes = @{}
 	$changes.Add("Required", $Required)
 	$changes.Add("DisplayName", $DisplayName)
 	$changes.Add("Description", $Description)
 	New-FimImportObject -ObjectType BindingDescription -State Put -Anchor $anchor -Changes $changes -ApplyNow
-	return $id.Value
+	#return $id.Value
+    return $id
 }
 
 Function Remove-Binding {
@@ -231,8 +235,10 @@ Function Remove-Binding {
 	$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
 	$objId = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
 	$binding = Get-FimObject -Filter "/BindingDescription[BoundAttributeType='$attrId' and BoundObjectType='$objId']"
-	[UniqueIdentifier] $id = $binding.ObjectID
-	Remove-FimObject -AnchorName ObjectID -AnchorValue $id.Value -ObjectType BindingDescription
+	#[UniqueIdentifier] $id = $binding.ObjectID
+    $id = $binding
+	#Remove-FimObject -AnchorName ObjectID -AnchorValue $id.Value -ObjectType BindingDescription
+    Remove-FimObject -AnchorName ObjectID -AnchorValue $id[0] -ObjectType BindingDescription
 }
 
 Function New-AttributeAndBinding {
@@ -269,7 +275,8 @@ Function New-AttributeAndBinding {
 		$ObjectType = "Person"
 	)
 
-	[UniqueIdentifier] $attrId = New-Attribute -Name $Name -DisplayName $DisplayName -Type $Type -MultiValued $MultiValued
+	#[UniqueIdentifier] $attrId = New-Attribute -Name $Name -DisplayName $DisplayName -Type $Type -MultiValued $MultiValued
+    [GUID] $attrId = New-Attribute -Name $Name -DisplayName $DisplayName -Type $Type -MultiValued $MultiValued
 	New-Binding -AttributeName $Name -DisplayName $DisplayName -ObjectType $ObjectType
 	if($ObjectType -eq "Person") {
 		Add-AttributeToMPR -AttrName $Name -MprName "Administration: Administrators can read and update Users"
