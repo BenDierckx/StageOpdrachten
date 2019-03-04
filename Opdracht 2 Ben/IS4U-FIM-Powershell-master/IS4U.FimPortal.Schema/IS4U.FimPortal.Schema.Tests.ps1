@@ -15,13 +15,12 @@ Describe "New-Attribute" {
     
     Context "Module Setup" {
         It "module file exists" {
-            Get-Module -ListAvailable | Where {$_.Name -eq 'IS4U.FimPortal.Schema'}
+            Get-Module -ListAvailable | Where-Object {$_.Name -eq 'IS4U.FimPortal.Schema'}
         }
     }
 
     Context "With parameters (mandatory)" {
-        $fimImport = [NewFimImportObject]::new()
-        Mock New-FimImportObject { $fimImport } -ModuleName "IS4U.FimPortal.Schema" -MockWith {$ObjectType, $State, $changes}
+        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {$ObjectType, $State, $changes}
         $result = New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
 
         It "New-FimImportObject get called" {
@@ -44,15 +43,14 @@ Describe "New-Attribute" {
 
 Describe "Update-Attribute" {
     Context "With parameters (mandatory)" {
-        $fimImport = [NewFimImportObject]::new()
-        Mock New-FimImportObject { $fimImport } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
             $ObjectType, $State, $anchor, $changes, $ApplyNow
         }
         #[GUID]$Id = "66b7d725-8226-4ccd-99ad-3540c44c49b6"
         Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
         $result = Update-Attribute -Name Visum -DisplayName Visum -Description "Update test"
         It "Module file is ready to be loaded" {
-            Get-Module -ListAvailable | Where {$_.Name -eq 'IS4U.FimPortal.Schema'}
+            Get-Module -ListAvailable | Where-Object {$_.Name -eq 'IS4U.FimPortal.Schema'}
         }
 
         It "Parameters get saved into object (Name, DisplayName, Description)" {
@@ -84,12 +82,11 @@ Describe "Remove-Attribute" {
     }
 }
 
-Describe "New-Binding" {   
-    Context "New-Binding with parameters, testing GUID (without parameters to New-FimObject)" {
-        $fimImport = [NewFimImportObject]::new()
-        Mock New-FimImportObject { $fimImport } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $ObjectType, $State, $changes, $ApplyNow, $SkipDuplicateCheck, $PassThru
-        }
+Describe "New-Binding" { 
+    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $ObjectType, $State, $changes, $ApplyNow, $SkipDuplicateCheck, $PassThru
+    }
+    Context "New-Binding with parameters, testing GUID (without parameters to Get-FimObject)" {
         Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
         $result = New-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
         It "AttrId and ObjId gets Id from Get-FimObjectID" {
@@ -98,11 +95,6 @@ Describe "New-Binding" {
     }
 
     Context "New-Binding with parameters aswell to mock to Get-FimObjectId" {
-        $fimImport = [NewFimImportObject]::new()
-        Mock New-FimImportObject { $fimImport } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $ObjectType, $State, $changes, $ApplyNow, $SkipDuplicateCheck, $PassThru
-        }
-
         Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
             $ObjectType, $AttributeName, $AttributeValue
         }
@@ -128,8 +120,7 @@ Describe "New-Binding" {
 }
 
 Describe "Update-Binding" {
-    $fimImport = [NewFimImportObject]::new()
-    Mock New-FimImportObject { $fimImport } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
         $ObjectType, $State, $anchor, $changes, $ApplyNow
     }
     Mock Get-FimObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
@@ -149,7 +140,7 @@ Describe "Update-Binding" {
             $ObjectType, $AttributeName, $AttributeValue
         }
 
-        $result = Update-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
+        Update-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
 
         It "AttrId sends correct parameters (+ test hashtable changes gets filled)" {
             Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
@@ -169,7 +160,7 @@ Describe "Update-Binding" {
                 #$ObjectType -eq "BindingDescription" -and $State -eq "Put" -and $changes["DisplayName"] -eq "Visa card number" -and $result[2].Values -eq "Visum"
                 $ObjectType | Should be "BindingDescription"
                 $State | Should be "Put"
-                #$anchor?
+                $anchor | Should BeNullOrEmpty
                 $changes["DisplayName"] | Should be "Visa Card Number"
                 $changes["Description"] | Should BeNullOrEmpty
 
@@ -417,11 +408,11 @@ Describe "New-ObjectType" {
 }
 
 Describe "Update-ObjectType" {
-    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
 
     Mock Get-FimObjectID { return New-Guid } -ModuleName "IS4U.FimPortal.Schema"
 
-    Context "With parameters" {
+    Context "With parameters, Get-FimObjectId returns a GUID" {
+        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
         $result = Update-ObjectType -Name "Department" -DisplayName "Department" -Description "Department"
 
         It "New-FimImportObject gets correct parameters" {
@@ -444,6 +435,16 @@ Describe "Update-ObjectType" {
 
         It "Get-FimObjectID returns a GUID" {
             $result.GetType() -eq [guid] |Should be $true
+        }
+    }
+    Context "With parameters, Get-FimObjectId returns its parameters" {
+        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+            $ObjectType, $State, $Anchor, $Changes, $ApplyNow
+        }
+        $result = Update-ObjectType -Name "Department" -DisplayName "Department" -Description "Department"
+        #anchor = result[2]
+        It "Coorect variable Anchor gets send" {
+            $result[2]["Name"] | Should be "Department"
         }
     }
 }

@@ -48,16 +48,23 @@ Function New-Attribute {
 		[String]
 		$MultiValued = "False"
 	)
-	$changes = @{}
+	<#$changes = @{}
 	$changes.Add("DisplayName", $DisplayName)
 	$changes.Add("Name", $Name)
 	$changes.Add("Description", $Description)
 	$changes.Add("DataType", $Type)
 	$changes.Add("Multivalued", $MultiValued)
-	$attr = New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes #-ApplyNow -SkipDuplicateCheck -PassThru
+	$attr = New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes#> #-ApplyNow -SkipDuplicateCheck -PassThru
 	#[UniqueIdentifier] $id = $attr.TargetObjectIdentifier
 	#return $id
-    return $attr
+	#return $attr
+	$obj = New-Resource -ObjectType AttributeTypeDescription
+	$obj.DisplayName = $DisplayName
+	$obj.Name = $Name
+	$obj.Description = $Description
+	$obj.DataType = $Type
+	$obj.MultiValued = $MultiValued
+	Save-Resource $obj
 }
 
 Function Update-Attribute {
