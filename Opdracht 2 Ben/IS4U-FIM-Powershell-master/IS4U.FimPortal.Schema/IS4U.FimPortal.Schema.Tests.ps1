@@ -220,5 +220,145 @@ Describe "Remove-Binding" {
     }
 }
 
+Describe "New-AttributeAndBinding" {
+    Mock New-Binding -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $AttributeName, $DisplayName, $ObjectType
+    } 
+    
+    Mock Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $AttrName, $MprName
+    }
+
+    Mock Add-AttributeToFilterScope -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $AttributeId, $DisplayName
+    }
+
+    Mock New-Attribute { return New-Guid } -ModuleName "IS4U.FimPortal.Schema"
+
+    Context "With parameters Name, DisplayName and Type to New-AttributeAndBinding" {
+        New-AttributeAndBinding -Name "Visa" -DisplayName "Visa Card Number" -Type String
+        It "New-Attribute sends correct parameters for variable attrId" {
+            Assert-MockCalled New-Attribute -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $Name -eq "Visa" 
+                $DisplayName -eq "Visa Card Number"
+                $Type -eq "String"
+            }
+        }
+
+        It "New-Attribute returns an UniqueIdentifier typ variable to attrId, this gets send with the correct DisplayName to Add-AttributeToFilterScope" {
+            Assert-MockCalled Add-AttributeToFilterScope -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttributeId.GetType() -eq [Microsoft.ResourceManagement.WebServices.UniqueIdentifier]
+                $DisplayName | Should be "Administrator Filter Permission"
+            }
+        }
+
+        It "Add-AttributeToMPR gets called twice" {
+            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa"
+            } -Exactly 2
+        }
+
+        It "Default ObjectType variable (='Person') sends correct parameters to Add-AttributeToMPR first time" {
+            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa" -and $MprName -eq "Administration: Administrators can read and update Users"
+            } -Exactly 1
+        }
+
+        It "Default ObjectType variable (='Person') sends correct parameters to Add-AttributeToMPR second time" {
+            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa" -and $MprName -eq "Synchronization: Synchronization account controls users it synchronizes"
+            } -Exactly 1
+        }
+    }
+
+    Context "With parameters Name, DisplayName, Type and ObjectType ('Group') to New-AttributeAndBinding" {
+        New-AttributeAndBinding -Name "Visa" -DisplayName "Visa Card Number" -Type String -ObjectType Group
+        It "Add-AttributeToMPR gets called twice" {
+            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa"
+            } -Exactly 2
+        }
+
+        It "Default ObjectType variable (='Group') sends correct parameters to Add-AttributeToMPR first time" {
+            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa" -and $MprName -eq "Group management: Group administrators can update group resources"
+            } -Exactly 1
+        }
+
+        It "ObjectType variable (='Group') sends correct parameters to Add-AttributeToMPR second time" {
+            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa" -and $MprName -eq "Synchronization: Synchronization account controls group resources it synchronizes"
+            } -Exactly 1
+        }
+    }
+}
+
+Describe "Remove-AttributeAndBinding" {
+    Mock Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $AttrName, $MprName
+    }
+
+    Mock Remove-AttributeFromFilterScope -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $AttributeName, $DisplayName
+    }
+
+    Mock Remove-Binding -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $AttributeName, $ObjectType
+    }
+
+    Mock Remove-Attribute -ModuleName "IS4U.FimPortal.Schema" -MockWith {
+        $Name
+    }
+
+    Context "With parameters Name" {
+        Remove-AttributeAndBinding -Name Visa
+        It "Default objectType calls Remove-AttributeFromMPR two times" {
+            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -Exactly 2
+        }
+
+        It "Remove-AttributeFromMpr gets correct parameters first call" {
+            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa" -and $MprName -eq "Administration: Administrators can read and update Users"
+            } -Exactly 1
+        }
+
+        It "Remove-AttributeFromMpr gets correct parameters second call" {
+            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttrName -eq "Visa" -and $MprName -eq "Synchronization: Synchronization account controls users it synchronizes"
+            } -Exactly 1
+        }
+
+        It "Remove-AttributeFromFilterScope sends correct parameters" {
+            Assert-MockCalled Remove-AttributeFromFilterScope -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttributeName -eq "Visa" -and $DisplayName -eq "Administrator Filter Permission"
+            }
+        }
+
+        It "Remove-Binding sends correct parameters" {
+            Assert-MockCalled Remove-Binding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttributeName -eq "Visa" -and $ObjectType -eq "Person"
+            }
+        }
+
+        It "Remove-Attribute sends correct parameters" {
+            Assert-MockCalled Remove-Attribute -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $Name -eq "Visa"
+            }
+        }
+    }
+
+    Context "With parameters Name and ObjectType ('Group')" {
+        Remove-AttributeAndBinding -Name "Visa" -ObjectType "Group"
+        It "Remove-AttributeFromMPR gets called 0 times" {
+            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -Exactly 0
+        }
+
+        It "Remove-Binding send correct parameters" {
+            Assert-MockCalled Remove-Binding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttributeName -eq "Visa" -and $ObjectType -eq "Group"
+            }
+        }
+    }
+}
 
 #Set-ExecutionPolicy -Scope process Unrestricted
