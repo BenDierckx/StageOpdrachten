@@ -4,6 +4,7 @@ Class NewFimImportObject {
     [string]$ObjectType
     [string]$State
     [Hashtable]$Changes = @{}
+    [Hashtable]$Anchor = @{}
     [bool]$ApplyNow
     [bool]$SkipDuplicateCheck
     [bool]$PassThru
@@ -356,6 +357,105 @@ Describe "Remove-AttributeAndBinding" {
         It "Remove-Binding send correct parameters" {
             Assert-MockCalled Remove-Binding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
                 $AttributeName -eq "Visa" -and $ObjectType -eq "Group"
+            }
+        }
+    }
+}
+
+Describe "Import-SchemaAttributesAndBindings and Import-SchemaBindings" {
+    Mock New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema"
+    Context "With PesterTesting.csv file" {
+        Import-SchemaAttributesAndBindings -CsvFile ".\PesterTesting.csv"
+        It "New-AttributeAndBinding gets called 3 times (3 records in Csv)" {
+            Assert-MockCalled New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema" -Exactly 3
+        }
+
+        It "New-AttributeAndBinding gets correct parameters (from first record)" {
+            Assert-MockCalled New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $Name -eq "Birthday" -and $DisplayName -eq "Birth date" -and $Type -eq "DateTime" -and $Multivalued -eq "false" -and $ObjectType -eq "Person"
+            } -Exactly 1
+        }
+
+        It "New-AttributeAndBinding gets correct parameters (from third record)" {
+            Assert-MockCalled New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $Name -eq "RoleDistributionList" -and $DisplayName -eq "Role gets a distribution list" -and $Type -eq "Boolean" -and $Multivalued -eq "false" -and $ObjectType -eq "Group"
+            } -Exactly 1
+        }
+    }
+}
+
+Describe "New-ObjectType" {
+    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
+
+    Mock Get-FimObjectID { return New-Guid } -ModuleName "IS4U.FimPortal.Schema"
+
+    Context "With parameters" {
+        $result = New-ObjectType -Name "Department" -DisplayName "Department" -Description "Department"
+
+        It "New-FimImportObject gets correct parameters" {
+            Assert-MockCalled New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription"
+                $State | Should be "Create" 
+                $Changes["DisplayName"] | Should be "Department" 
+                $Changes["Name"] | Should be "Department" 
+                $Changes["Description"] | Should be "Department"
+            }
+        }
+        
+        It "Get-FimObjectId gets correct parameters" {
+            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription"
+                $AttributeName | Should be "Name"
+                $AttributeValue | Should be "Department"
+            }
+        }
+
+        It "Get-FimObjectID returns a GUID" {
+            $result.GetType() -eq [guid] |Should be $true
+        }
+    }
+}
+
+Describe "Update-ObjectType" {
+    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
+
+    Mock Get-FimObjectID { return New-Guid } -ModuleName "IS4U.FimPortal.Schema"
+
+    Context "With parameters" {
+        $result = Update-ObjectType -Name "Department" -DisplayName "Department" -Description "Department"
+
+        It "New-FimImportObject gets correct parameters" {
+            Assert-MockCalled New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription"
+                $State | Should be "Put" 
+                #$Anchor["Name"] | Should be "Department" null array
+                $Changes["DisplayName"] | Should be "Department" 
+                $Changes["Description"] | Should be "Department"
+            }
+        }
+        
+        It "Get-FimObjectId gets correct parameters" {
+            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription"
+                $AttributeName | Should be "Name"
+                $AttributeValue | Should be "Department"
+            }
+        }
+
+        It "Get-FimObjectID returns a GUID" {
+            $result.GetType() -eq [guid] |Should be $true
+        }
+    }
+}
+
+Describe "Remove-ObjectType" {
+    Mock Remove-FimObject -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        Remove-ObjectType -Name "Department"
+        It "Remove-FimObject get correct parameters" {
+            Assert-MockCalled Remove-FimObject -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AnchorName -eq "Name" -and $ObjectType -eq "ObjectTypeDescription"
+                $AnchorValue | Should be "Department"
             }
         }
     }
