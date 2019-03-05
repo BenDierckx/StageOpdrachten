@@ -64,7 +64,8 @@ Function New-Attribute {
 	$obj.Description = $Description
 	$obj.DataType = $Type
 	$obj.MultiValued = $MultiValued
-	Save-Resource $obj
+	#Save-Resource $obj
+	return $obj
 }
 
 Function Update-Attribute {
@@ -91,13 +92,18 @@ Function Update-Attribute {
 		[String]
 		$Description
 	)
-	$anchor = @{'Name' = $Name}
+	<#$anchor = @{'Name' = $Name}
 	$changes = @{}
 	$changes.Add("DisplayName", $DisplayName)
 	$changes.Add("Description", $Description)
 	New-FimImportObject -ObjectType AttributeTypeDescription -State Put -Anchor $anchor -Changes $changes -ApplyNow
 	[GUID] $id = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name
-	return $id
+	return $id#>
+	$obj = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name
+	$obj.DisplayName = $DisplayName
+	$obj.Description = $Description
+	#Save-Resource $obj
+	return $obj
 }
 
 Function Remove-Attribute {
@@ -116,7 +122,8 @@ Function Remove-Attribute {
 		[String]
 		$Name
 	)
-	Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType AttributeTypeDescription
+	#Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType AttributeTypeDescription
+	Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
 }
 
 Function New-Binding {
@@ -154,7 +161,7 @@ Function New-Binding {
 		[String]
 		$ObjectType = "Person"
 	)
-	$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
+	<#$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
 	$objId = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
 	$changes = @{}
 	$changes.Add("Required", $Required)
@@ -165,7 +172,19 @@ Function New-Binding {
 	$binding = New-FimImportObject -ObjectType BindingDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
 	#[UniqueIdentifier] $id = $binding.TargetObjectIdentifier
 	#return $id
-    return $binding
+	return $binding#>
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ID
+	$obj = New-Resource -ObjectType BindingDescription
+	$obj.Required = $Required
+	$obj.DisplayName = $DisplayName
+	$obj.Description = $Description
+	$obj.BoundAttributeType = $attrId
+	$obj.BoundObjectType = $objId
+	#Save-Resource $obj
+	#[GUID]$Id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
+	$obj.id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
+	return $obj
 }
 
 Function Update-Binding {
@@ -203,7 +222,7 @@ Function Update-Binding {
 		[String]
 		$ObjectType = "Person"
 	)
-	$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
+	<#$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
 	$objId = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
 	$binding = Get-FimObject -Filter "/BindingDescription[BoundAttributeType='$attrId' and BoundObjectType='$objId']"
 	#[UniqueIdentifier] $id = $binding.ObjectID
@@ -216,7 +235,16 @@ Function Update-Binding {
 	$changes.Add("Description", $Description)
 	New-FimImportObject -ObjectType BindingDescription -State Put -Anchor $anchor -Changes $changes -ApplyNow
 	#return $id.Value
-    return $id
+	return $id#>
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ID
+	[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
+	$obj = Get-Resource -ObjectType BindingDescription -ID = $id
+	$obj.Required = $Required
+	$obj.DisplayName = $DisplayName
+	$obj.Description = $Description
+	#Save-Resource $obj
+	return $obj
 }
 
 Function Remove-Binding {
