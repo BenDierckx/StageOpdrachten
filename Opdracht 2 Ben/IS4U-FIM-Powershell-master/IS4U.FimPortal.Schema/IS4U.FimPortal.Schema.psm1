@@ -239,12 +239,13 @@ Function Update-Binding {
 	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ID
 	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ID
 	[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
-	$obj = Get-Resource -ObjectType BindingDescription -ID = $id
+	#$id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
+	$obj = Get-Resource -ID = $id
 	$obj.Required = $Required
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
 	#Save-Resource $obj
-	return $obj
+	return $id
 }
 
 Function Remove-Binding {
@@ -267,13 +268,17 @@ Function Remove-Binding {
 		[String]
 		$ObjectType = "Person"
 	)
-	$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
+	<#$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
 	$objId = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
 	$binding = Get-FimObject -Filter "/BindingDescription[BoundAttributeType='$attrId' and BoundObjectType='$objId']"
 	#[UniqueIdentifier] $id = $binding.ObjectID
     $id = $binding
 	#Remove-FimObject -AnchorName ObjectID -AnchorValue $id.Value -ObjectType BindingDescription
-    Remove-FimObject -AnchorName ObjectID -AnchorValue $id[0] -ObjectType BindingDescription
+	Remove-FimObject -AnchorName ObjectID -AnchorValue $id[0] -ObjectType BindingDescription#>
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ID
+	[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
+	Remove-Resource -ID $id
 }
 
 Function New-AttributeAndBinding {
