@@ -281,6 +281,7 @@ Function Remove-Binding {
 	Remove-Resource -ID $id
 }
 
+<# Niet gebruikt voorlopig #>
 Function New-AttributeAndBinding {
 <#
 	.SYNOPSIS
@@ -327,6 +328,7 @@ Function New-AttributeAndBinding {
 	Add-AttributeToFilterScope -AttributeId $attrId -DisplayName "Administrator Filter Permission"
 }
 
+<# Niet gebruikt voorlopig #>
 Function Remove-AttributeAndBinding {
 <#
 	.SYNOPSIS
@@ -356,6 +358,7 @@ Function Remove-AttributeAndBinding {
 	Remove-Attribute -Name $Name
 }
 
+<# Niet gebruikt voorlopig #>
 Function Import-SchemaAttributesAndBindings {
 <#
 	.SYNOPSIS
@@ -427,12 +430,19 @@ Function New-ObjectType {
 		[String]
 		$Description
 	)
-	$changes = @{}
+	<#$changes = @{}
 	$changes.Add("DisplayName", $DisplayName)
 	$changes.Add("Name", $Name)
 	$changes.Add("Description", $Description)
 	New-FimImportObject -ObjectType ObjectTypeDescription -State Create -Changes $changes -ApplyNow
 	[GUID] $id = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name
+	return $id#>
+	$obj = New-Resource -ObjectType ObjectTypeDescription
+	$obj.DisplayName = $DisplayName
+	$obj.Name = $Name
+	$obj.Description = $Description
+	#Save-Resource $obj
+	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
 	return $id
 }
 
@@ -460,12 +470,18 @@ Function Update-ObjectType {
 		[String]
 		$Description
 	)
-	$anchor = @{'Name' = $name}
+	<#$anchor = @{'Name' = $name}
 	$changes = @{}
 	$changes.Add("DisplayName", $DisplayName)
 	$changes.Add("Description", $Description)
 	New-FimImportObject -ObjectType ObjectTypeDescription -State Put -Anchor $anchor -Changes $changes -ApplyNow
 	[GUID] $id = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name
+	return $id#>
+	$obj = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name 
+	$obj.DisplayName = $DisplayName
+	$obj.Description = $Description
+	#Save-Resource $obj
+	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
 	return $id
 }
 
@@ -485,7 +501,8 @@ Function Remove-ObjectType {
 		[String]
 		$Name
 	)
-	Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType ObjectTypeDescription
+	#Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType ObjectTypeDescription
+	Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
 }
 
 Function New-ObjectTypeConfiguration {
