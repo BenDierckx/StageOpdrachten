@@ -123,7 +123,10 @@ Function Remove-Attribute {
 		$Name
 	)
 	#Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType AttributeTypeDescription
-	Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
+	#Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
+	# To be sure we get the correct object the ID gets returned from Get-Resource, this ID will be send with Remove-Resource
+	$id = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
+	Remove-Resource -ID $id
 }
 
 Function New-Binding {
@@ -502,7 +505,9 @@ Function Remove-ObjectType {
 		$Name
 	)
 	#Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType ObjectTypeDescription
-	Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
+	#Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
+	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
+	Remove-Resource -ID $id
 }
 
 Function New-ObjectTypeConfiguration {

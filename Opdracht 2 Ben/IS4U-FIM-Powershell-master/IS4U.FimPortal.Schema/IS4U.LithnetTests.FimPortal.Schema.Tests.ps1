@@ -71,7 +71,7 @@ Describe "Update-Attribute" {
 }
 
 Describe "Remove-Attribute" {
-    Mock Get-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Mock Get-Resource { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
     Mock Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
     Context "With parameters" {
         Remove-Attribute -Name "Visa"
@@ -81,6 +81,9 @@ Describe "Remove-Attribute" {
                 $AttributeName | Should be "Name"
                 $AttributeValue | Should be "Visa"
             }
+        }
+        It "Remove-Resource gets called" {
+            Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
         }
     }
 }
@@ -304,7 +307,7 @@ Describe "Update-ObjectType" {
 }
 
 Describe "Remove-ObjectType" {
-    Mock Get-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Mock Get-Resource { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
     Mock Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
     Context "With parameter" {
         It "Get-Resource uses the correct parameters" {
