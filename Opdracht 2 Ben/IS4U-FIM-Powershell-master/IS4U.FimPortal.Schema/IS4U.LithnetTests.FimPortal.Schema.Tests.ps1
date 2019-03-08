@@ -1,4 +1,108 @@
 Import-Module IS4U.FimPortal.Schema
+# Set-ExecutionPolicy -Scope Process Unrestricted
+
+Describe "New-Person" {
+    Mock New-Resource {
+        $person = [PSCustomObject]@{
+            Address = ""
+            City = ""
+            Country = ""
+            Department = ""
+            DisplayName = ""
+            Domain = ""
+            EmailAlias = ""
+            EmployeeId = ""
+            EmployeeType = ""
+            FirstName = ""
+            JobTitle = ""
+            LastName = ""
+            OfficePhone = ""
+            PostalCode = ""
+            RasAccessPermission = ""
+        } 
+        return $person
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        $result = New-Person -Address "Prins Boudewijnlaan 41" -City Edegem -Country BE -Department "IBM/Imprivata" -DisplayName WDecruy `
+        -Domain FIM -EmailAlias wdecruj -EmployeeId 696969 -EmployeeType Intern -FirstName Wouter -JobTitle "Security Architect" `
+        -LastName Decruy -OfficePhone 0471151515 -PostalCode 2650 -RasAccessPermission $false
+        It "Get-Resource gets called" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 1
+        }
+        It "Get-Resource gets correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                # At least one -eq comparison has to be entered for the ParameterFilter work
+                $ObjectType -eq "User"
+            }
+        }
+        It "person gets filled and should be send to Save-Resource" {
+            $result.Address | Should be "Prins Boudewijnlaan 41"
+            $result.City | Should be "Edegem"
+            $result.DisplayName | Should be "WDecruy"
+            $result.FirstName | Should be "Wouter"
+            $result.LastName | Should be "Decruy"
+        }
+    }
+}
+
+Describe "Update-Person" {
+    Mock Get-Resource {
+        $person = [PSCustomObject]@{
+            Address = ""
+            City = ""
+            Country = ""
+            Department = ""
+            DisplayName = ""
+            Domain = ""
+            EmailAlias = ""
+            EmployeeId = ""
+            EmployeeType = ""
+            FirstName = ""
+            JobTitle = ""
+            LastName = ""
+            OfficePhone = ""
+            PostalCode = ""
+            RasAccessPermission = ""
+        } 
+        return $person
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        $result = Update-Person -DisplayName WDecruy -FirstName Wouter -LastName Decruy
+        It "New-Resource gets called" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 1
+        }
+        It "New-Resource gets correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                # At least one -eq comparison has to be entered for the ParameterFilter work
+                $ObjectType -eq "User" -and $AttributeName -eq "DisplayName"
+                $AttributeValue | Should be "WDecruy"
+            }
+        }
+        It "person gets filled and should be send to Save-Resource" {
+            $result.DisplayName | Should be "WDecruy"
+            $result.FirstName | Should be "Wouter"
+            $result.LastName | Should be "Decruy"
+        }
+    }
+}
+
+Describe "Remove-Person" {
+    Mock Get-Resource { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
+    Mock Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        Remove-Person -DisplayName "WDecruy"
+        It "Get-Resource gets correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "User" 
+                $AttributeName | Should be "DisplayName"
+                $AttributeValue | Should be "WDecruy"
+            }
+        }
+        It "Remove-Resource gets called" {
+            Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
+        }
+    }
+}
 
 Describe "New-Attribute" {
     Mock New-Resource {
@@ -152,7 +256,6 @@ Describe "Update-Binding" {
                     DisplayName = ""
                     Description = ""
                 }
-                $mockCounter = 0;                   # Set mockCounter back to 0 when tests are completed and get repeated
                 return $obj                         # After the 3rd call, Get-Resource returns a PsCustomObject
             }
         }

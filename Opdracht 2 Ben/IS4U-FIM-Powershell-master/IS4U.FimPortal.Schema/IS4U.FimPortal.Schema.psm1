@@ -15,6 +15,228 @@ here: http://opensource.org/licenses/gpl-3.0.
 #>
 Set-StrictMode -Version Latest
 
+#region Lithnet
+if(!(Get-Module -Name LithnetRMA))
+{
+Import-Module LithnetRMA;
+}
+
+#Set-ResourceManagementClient -BaseAddress $FIMServiceURI;
+#endregion Lithnet
+
+Function New-Person {
+<#
+	.SYNOPSIS
+	Create a new person in the FIM Portal schema.
+
+	.DESCRIPTION
+	Create a new person in the FIM Portal schema.
+
+	.EXAMPLE
+	New-Person -Address "Prins Boudewijnlaan 41" -City Edegem -Country BE -Department "IBM/Imprivata" -DisplayName WDecruy 
+	-Domain FIM -EmailAlias wdecruy -EmployeeId 696969 -EmployeeType Intern -FirstName Wouter -JobTitle "Security Architect" 
+	-LastName Decruy -OfficePhone 0471151515 -PostalCode 2650 -RasAccessPermission "False"
+#>
+	param(
+		[Parameter(Mandatory=$True)]
+		[String]
+		$Address,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$City,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		[ValidateLength(2, 2)]    # Has to have a length of 2 (Example: BE)
+		$Country,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$Department,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$DisplayName,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$Domain,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$EmailAlias,
+
+		[Parameter(Mandatory=$True)]
+		[Int]
+		$EmployeeId,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$EmployeeType,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$FirstName,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$JobTitle,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$LastName,
+
+		[Parameter(Mandatory=$True)]
+		[Int]
+		$OfficePhone,
+
+		[Parameter(Mandatory=$True)]
+		[Int]
+		[ValidateRange(1000, 9999)]
+		$PostalCode,
+
+		[Parameter(Mandatory=$False)]
+		[Bool]
+		$RasAccessPermission = $False
+	)
+
+	$person = New-Resource -ObjectType User
+	$person.Address = $Address
+	$person.City = $City
+	$person.Country = $Country
+	$person.Department = $Department
+	$person.DisplayName = $DisplayName
+	$person.Domain = $Domain
+	$person.EmailAlias = $EmailAlias
+	$person.EmployeeId = $EmployeeId
+	$person.EmployeeType = $EmployeeType
+	$person.FirstName = $FirstName
+	$person.JobTitle = $JobTitle
+	$person.LastName = $LastName
+	$person.OfficePhone = $OfficePhone
+	$person.PostalCode = $PostalCode
+	$person.RasAccessPermission = $RasAccessPermission
+	#Save-Resource $person
+	return $person
+}
+
+Function Update-Person {
+<#
+	.SYNOPSIS
+	Update a new person in the FIM Portal schema.
+
+	.DESCRIPTION
+	Update a new person in the FIM Portal schema.
+
+	.EXAMPLE
+	Update-Person -DisplayName WDecruy -FirstName Wouter -LastName Decruy
+#>
+	param(
+		[Parameter(Mandatory=$False)]
+		[String]
+		$Address,
+
+		[Parameter(Mandatory=$False)]
+		[String]
+		$City,
+
+		[Parameter(Mandatory=$False)]
+		[String]
+		[ValidateLength(2, 2)]
+		$Country,
+
+		[Parameter(Mandatory=$False)]
+		[String]
+		$Department,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$DisplayName,
+
+		[Parameter(Mandatory=$False)]
+		[String]
+		$Domain,
+
+		[Parameter(Mandatory=$False)]
+		[String]
+		$EmailAlias,
+
+		[Parameter(Mandatory=$False)]
+		[Int]
+		$EmployeeId,
+
+		[Parameter(Mandatory=$False)]
+		[String]
+		$EmployeeType,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$FirstName,
+
+		[Parameter(Mandatory=$False)]
+		[String]
+		$JobTitle,
+
+		[Parameter(Mandatory=$True)]
+		[String]
+		$LastName,
+
+		[Parameter(Mandatory=$False)]
+		[Int]
+		$OfficePhone,
+
+		[Parameter(Mandatory=$False)]
+		[Int]
+		[ValidateRange(1000, 9999)]
+		$PostalCode,
+
+		[Parameter(Mandatory=$False)]
+		[Bool]
+		$RasAccessPermission = $False
+	)
+	
+	$person = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName
+	$person.Address = $Address
+	$person.City = $City
+	$person.Country = $Country
+	$person.Department = $Department
+	$person.DisplayName = $DisplayName
+	$person.Domain = $Domain
+	$person.EmailAlias = $EmailAlias
+	$person.EmployeeId = $EmployeeId
+	$person.EmployeeType = $EmployeeType
+	$person.FirstName = $FirstName
+	$person.JobTitle = $JobTitle
+	$person.LastName = $LastName
+	$person.OfficePhone = $OfficePhone
+	$person.PostalCode = $PostalCode
+	$person.RasAccessPermission = $RasAccessPermission
+	#Save-Resource $person
+	return $person
+}
+
+Function Remove-Person {
+<#
+	.SYNOPSIS
+	Remove a new person in the FIM Portal schema.
+
+	.DESCRIPTION
+	Remove a new person in the FIM Portal schema.
+
+	.EXAMPLE
+	Remove-Person -DisplayName WDecruy
+#>
+	param(
+		[Parameter(Mandatory=$True)]
+		[String]
+		$DisplayName
+	)
+
+	$id = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
+	Remove-Resource -ID $id
+}
+
 Function New-Attribute {
 <#
 	.SYNOPSIS
