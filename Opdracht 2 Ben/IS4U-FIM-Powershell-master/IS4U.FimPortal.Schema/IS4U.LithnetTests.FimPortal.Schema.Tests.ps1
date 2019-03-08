@@ -87,7 +87,7 @@ Describe "Update-Person" {
 }
 
 Describe "Remove-Person" {
-    Mock Get-Resource { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
+    Mock Get-Resource { [Guid] "a97ddb67-bd15-40ff-af4e-bf2acfc4fb89" } -ModuleName "IS4U.FimPortal.Schema"
     Mock Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
     Context "With parameters" {
         Remove-Person -DisplayName "WDecruy"
@@ -100,6 +100,11 @@ Describe "Remove-Person" {
         }
         It "Remove-Resource gets called" {
             Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
+        }
+        It "Remove-Resource uses correct ID Value" {
+            Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ID -eq "a97ddb67-bd15-40ff-af4e-bf2acfc4fb89" | Should be $true
+            }
         }
     }
 }
