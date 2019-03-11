@@ -26,11 +26,11 @@ Describe "New-Person" {
         $result = New-Person -Address "Prins Boudewijnlaan 41" -City Edegem -Country BE -Department "IBM/Imprivata" -DisplayName WDecruy `
         -Domain FIM -EmailAlias wdecruj -EmployeeId 696969 -EmployeeType Intern -FirstName Wouter -JobTitle "Security Architect" `
         -LastName Decruy -OfficePhone 0471151515 -PostalCode 2650 -RasAccessPermission $false
-        It "Get-Resource gets called" {
-            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 1
+        It "New-Resource gets called" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 1
         }
-        It "Get-Resource gets correct parameters" {
-            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+        It "New-Resource gets correct parameters" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
                 # At least one -eq comparison has to be entered for the ParameterFilter work
                 $ObjectType -eq "User"
             }
@@ -68,17 +68,18 @@ Describe "Update-Person" {
     } -ModuleName "IS4U.FimPortal.Schema"
     Context "With parameters" {
         $result = Update-Person -DisplayName WDecruy -FirstName Wouter -LastName Decruy
-        It "New-Resource gets called" {
+        It "Get-Resource gets called" {
             Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 1
         }
-        It "New-Resource gets correct parameters" {
+        # this test is the same as: Get-Resource gets called. But with parameters and is more safe!
+        It "Get-Resource gets correct parameters" {
             Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
                 # At least one -eq comparison has to be entered for the ParameterFilter work
                 $ObjectType -eq "User" -and $AttributeName -eq "DisplayName"
                 $AttributeValue | Should be "WDecruy"
             }
         }
-        It "person gets filled and should be send to Save-Resource" {
+        It "correct parameters get used to update the person" {
             $result.DisplayName | Should be "WDecruy"
             $result.FirstName | Should be "Wouter"
             $result.LastName | Should be "Decruy"

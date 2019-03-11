@@ -196,7 +196,14 @@ Function Update-Person {
 		$RasAccessPermission = $False
 	)
 	
-	$person = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName
+	<#
+		PSBoundparameter is used so that only the parameters that get send will be used to update the User's atrributes!
+	#>
+	$global:person = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName
+	foreach ($boundparam in $PSBoundParameters.GetEnumerator()) {
+		$global:person.($boundparam.Key) = $boundparam.Value
+	}
+	<#$person = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName
 	$person.Address = $Address
 	$person.City = $City
 	$person.Country = $Country
@@ -212,7 +219,7 @@ Function Update-Person {
 	$person.OfficePhone = $OfficePhone
 	$person.PostalCode = $PostalCode
 	$person.RasAccessPermission = $RasAccessPermission
-	#Save-Resource $person
+	#Save-Resource $person#>
 	return $person
 }
 
