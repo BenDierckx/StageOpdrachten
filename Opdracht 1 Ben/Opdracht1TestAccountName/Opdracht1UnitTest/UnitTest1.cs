@@ -43,8 +43,7 @@ namespace Opdracht1UnitTest
             Assert.AreEqual(expectedOutput, actualOutput);
         }
 
-        //Tests if the generateAccount function returns the correct account (3 letters from lastName
-        //with initials).
+        //Tests if the generateAccount function returns the correct account (5 letters from lastName)
         [TestMethod]
         public void TestOtherNamesGenerateAccountGiveCorrectOutput()
         {
