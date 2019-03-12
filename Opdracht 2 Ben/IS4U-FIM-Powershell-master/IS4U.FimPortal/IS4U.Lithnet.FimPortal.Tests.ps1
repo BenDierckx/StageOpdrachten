@@ -2,7 +2,6 @@ Import-Module IS4U.FimPortal
 # Set-ExecutionPolicy -Scope Process Unrestricted
 
 Describe "New-Mpr" {
-    Mock New-FimImportChange -ModuleName "IS4U.FimPortal"
     Mock Get-Resource { New-Guid } -ModuleName "IS4U.FimPortal"
     Mock New-Resource {
         $object = [PSCustomObject]@{
@@ -21,10 +20,10 @@ Describe "New-Mpr" {
         }
         return $object
     } -ModuleName "IS4U.FimPortal"
-    Context "With parameters" {
-        $result = New-Mpr -DisplayName "test" -PrincipalSet new-guid -ResourceCurrentSet new-guid -ResourceFinalSet new-guid -ActionType @("atr1", "atr2") `
-        -ActionParameter @("art3", "atr4") -GrantRight $true  -ManagementPolicyRuleType "testing" -AuthenticationWorkflowDefinition new-guid `
-        -ActionWorkflowDefinition $null -Disabled $false -Description "hallo"
+    Context "With 2 items in array and with parameters AuthenticationWorkflowDefinition and ActionWorkflowDefinition" {
+        $result = New-Mpr -DisplayName "test" -PrincipalSet New-Guid -ResourceCurrentSet New-Guid -ResourceFinalSet New-Guid `
+        -ActionType @("atr1", "atr2") -ActionParameter @("art3", "atr4") -GrantRight $true  -ManagementPolicyRuleType "testing" `
+        -AuthenticationWorkflowDefinition New-Guid -Disabled $false -Description "hallo"
         It "New-Resource gets called" {
             Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal"
         }
@@ -53,14 +52,10 @@ Describe "New-Mpr" {
         It "New-Mpr without parameter ActionWorkflowDefinition does not fill ActionWorkflowDefinition on resource" {
             $result.ActionWorkflowDefinition | Should be $null
         }
-        It "New-FimImportChange gets called 13 times with AuthenticationWorkflowDefinition parameter" {
-            Assert-MockCalled New-FimImportChange -ModuleName "IS4U.FimPortal" -Exactly 13
-        }
     }
 }
 
 Describe "Update-Mpr" {
-    Mock New-FimImportChange -ModuleName "IS4U.FimPortal"
     Mock Get-Resource {
         $object = [PSCustomObject]@{
             DisplayName = ""
@@ -78,8 +73,8 @@ Describe "Update-Mpr" {
         }
         return $object
     } -ModuleName "IS4U.FimPortal"
-    Context "With parameters" {
-        $result = Update-Mpr -DisplayName "test" -PrincipalSet new-guid -ResourceCurrentSet new-guid -ResourceFinalSet new-guid `
+    Context "With 2 items in array and with parameters AuthenticationWorkflowDefinition and ActionWorkflowDefinition" {
+        $result = Update-Mpr -DisplayName "test" -PrincipalSet New-Guid -ResourceCurrentSet New-Guid -ResourceFinalSet new-guid `
         -ActionType @("atr1", "atr2") -ActionParameter @("art3", "atr4") -GrantRight $true  -AuthenticationWorkflowDefinition new-guid `
         -ActionWorkflowDefinition $null -Disabled $false -Description "hallo"
         It "Get-Resource gets called with correct parameters" {
@@ -102,9 +97,6 @@ Describe "Update-Mpr" {
         It "New-Mpr without parameter ActionWorkflowDefinition does not fill ActionWorkflowDefinition on resource" {
             $result.ActionWorkflowDefinition | Should be $null
         }
-        It "New-FimImportChange gets called 11 times with AuthenticationWorkflowDefinition parameter" {
-            Assert-MockCalled New-FimImportChange -ModuleName "IS4U.FimPortal" -Exactly 11
-        }
     }
 }
 
@@ -125,6 +117,99 @@ Describe "Remove-Mpr" {
         }
         It "Remove-Resource uses correct parameters" {
             $ID -eq "049c0565-22e5-474f-9843-df8a4c1e78e2"
+        }
+    }
+}
+
+Describe "Enable-Mpr" {
+    Mock Get-Resource {
+        $object = [PSCustomObject]@{
+            Disabled = ""
+        }
+        return $object
+    } -ModuleName "IS4U.FimPortal"
+    Mock Save-Resource -ModuleName "IS4U.FimPortal"
+    Context "With parameters" {
+        $result = Enable-Mpr -DisplayName "Host"
+        It "Get-Resource gets correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal" -ParameterFilter {
+                $ObjectType -eq "ManagementPolicyRule"
+                $AttributeName | Should be "DisplayName"
+                $AttributeValue | Should be "Host"
+            }
+        }
+        It "Variable resource gets correct input" {
+            $result.Disabled | Should be $false
+        }
+    }
+}
+
+Describe "Disable-Mpr" {
+    Mock Get-Resource {
+        $object = [PSCustomObject]@{
+            Disabled = ""
+        }
+        return $object
+    } -ModuleName "IS4U.FimPortal"
+    Mock Save-Resource -ModuleName "IS4U.FimPortal"
+    Context "With parameters" {
+        $result = Disable-Mpr -DisplayName "Host"
+        It "Get-Resource gets correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal" -ParameterFilter {
+                $ObjectType -eq "ManagementPolicyRule"
+                $AttributeName | Should be "DisplayName"
+                $AttributeValue | Should be "Host"
+            }
+        }
+        It "Variable resource gets correct input" {
+            $result.Disabled | Should be $true
+        }
+    }
+}
+
+Describe "Add-AttributeToMpr" {
+    Mock Get-Resource {
+        $object = [PSCustomObject]@{
+            ActionParameter = @()
+        }
+        return $object
+    } -ModuleName "IS4U.FimPortal"
+    Mock Save-Resource -ModuleName "IS4U.FimPortal"
+    Context "With parameters" {
+        $result = Add-AttributeToMpr -AttrName "Host" -MprName "Admin"
+        It "Get-Resource gets correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal" -ParameterFilter {
+                $ObjectType -eq "ManagementPolicyRule"
+                $AttributeName | Should be "DisplayName"
+                $AttributeValue | Should be "Admin"
+            }
+        }
+        It "Variable resource gets correct input" {
+            $result.ActionParameter[0] | Should be "Host"
+        }
+    }
+}
+
+Describe "Remove-AttributeFromMpr" {
+    Mock Get-Resource {
+        $object = [PSCustomObject]@{
+            ActionParameter = @("test1", "Visa", "test2")
+        }
+        return $object
+    } -ModuleName "IS4U.FimPortal"
+    Mock Save-Resource -ModuleName "IS4U.FimPortal"
+    Context "With parameters" {
+        $result = Remove-AttributeFromMpr -AttrName "Visa" -MprName "Admin"
+        It "Get-Resource gets correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal" -ParameterFilter {
+                $ObjectType -eq "ManagementPolicyRule"
+                $AttributeName | Should be "DisplayName"
+                $AttributeValue | Should be "Admin"
+            }
+        }
+        It "Variable resource gets correct input and AttrName gets removed from array" {
+            $result.ActionParameter[0] | Should be "test1"
+            $result.ActionParameter[1] | Should be "test2"
         }
     }
 }

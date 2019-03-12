@@ -434,7 +434,7 @@ Function New-Mpr {
 		[String]
 		$Description
 	)
-	$changes = @()
+	<#$changes = @()
 	$changes += New-FimImportChange -Operation 'None' -AttributeName 'DisplayName' -AttributeValue $DisplayName
 	$changes += New-FimImportChange -Operation 'None' -AttributeName 'Description' -AttributeValue $Description
 	$changes += New-FimImportChange -Operation 'None' -AttributeName 'PrincipalSet' -AttributeValue $PrincipalSet.ToString()
@@ -454,7 +454,7 @@ Function New-Mpr {
 	}
 	if($AuthenticationWorkflowDefinition -ne $null) {
 		$changes += New-FimImportChange -Operation 'Add' -AttributeName 'AuthenticationWorkflowDefinition' -AttributeValue $AuthenticationWorkflowDefinition.ToString()
-	}
+	}#>
 	#New-FimImportObject -ObjectType ManagementPolicyRule -State Create -Changes $changes -ApplyNow
 	#[GUID] $id = Get-FimObjectID -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	#$resource = New-Resource -ObjectType ManagementPolicyRule
@@ -463,12 +463,12 @@ Function New-Mpr {
 	foreach ($boundparam in $PSBoundParameters.GetEnumerator()) {
 		if ($boundparam.key -eq "ActionParameter") {
 			foreach ($item in $boundparam) {
-				$global:resource.($boundparam.key) = $item.value				#Array
+				$global:resource.($boundparam.key) += $item.value				#Array
 			}
 		} 
 		elseif ($boundparam.key -eq "ActionType") {
 			foreach ($item in $boundparam) {
-				$global:resource.($boundparam.key) = $item.value				#Array
+				$global:resource.($boundparam.key) += $item.value				#Array
 			}
 		}
 		else {
@@ -537,7 +537,7 @@ Function Update-Mpr {
 		$Description
 	)
 	#$anchor = @{'DisplayName' = $DisplayName}
-	$changes = @()
+	<#$changes = @()
 	$changes += New-FimImportChange -Operation 'None' -AttributeName 'Description' -AttributeValue $Description
 	$changes += New-FimImportChange -Operation 'None' -AttributeName 'PrincipalSet' -AttributeValue $PrincipalSet.ToString()
 	foreach($param in $ActionParameter) {
@@ -555,24 +555,12 @@ Function Update-Mpr {
 	}
 	if($AuthenticationWorkflowDefinition -ne $null) {
 		$changes += New-FimImportChange -Operation 'Add' -AttributeName 'AuthenticationWorkflowDefinition' -AttributeValue $AuthenticationWorkflowDefinition.ToString()
-	}
+	}#>
 	#New-FimImportObject -ObjectType ManagementPolicyRule -State Put -Anchor $anchor -Changes $changes -ApplyNow
 	#[GUID] $id = Get-FimObjectID -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	$global:resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	foreach ($boundparam in $PSBoundParameters.GetEnumerator()) {
-		if ($boundparam.key -eq "ActionParameter") {
-			foreach ($item in $boundparam) {
-				$global:resource.($boundparam.key) = $item.value				#Array
-			}
-		} 
-		elseif ($boundparam.key -eq "ActionType") {
-			foreach ($item in $boundparam) {
-				$global:resource.($boundparam.key) = $item.value				#Array
-			}
-		}
-		else {
-			$global:resource.($boundparam.key) = $boundparam.value				#Variable
-		}
+		$global:resource.($boundparam.key) = $boundparam.value				#Variable
 	}
 	#Save-Resource $resource
 	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
@@ -619,7 +607,8 @@ Function Enable-Mpr {
 	#New-FimImportObject -ObjectType ManagementPolicyRule -State Put -Anchor $anchor -Changes $changes -ApplyNow
 	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	$resource.Disabled = $false
-	Save-Resource $resource
+	#Save-Resource $resource
+	return $resource
 }
 
 Function Disable-Mpr {
@@ -643,7 +632,8 @@ Function Disable-Mpr {
 	#New-FimImportObject -ObjectType ManagementPolicyRule -State Put -Anchor $anchor -Changes $changes -ApplyNow
 	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	$resource.Disabled = $true
-	Save-Resource $resource
+	#Save-Resource $resource
+	return $resource
 }
 
 Function Add-AttributeToMpr {
@@ -669,9 +659,10 @@ Function Add-AttributeToMpr {
 	#$anchor = @{'DisplayName' = $MprName}
 	#$changes = @(New-FimImportChange -Operation 'Add' -AttributeName 'ActionParameter' -AttributeValue $AttrName)
 	#New-FimImportObject -ObjectType ManagementPolicyRule -State Put -Anchor $anchor -Changes $changes -ApplyNow
-	$resource = $resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $MprName
+	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $MprName
 	$resource.ActionParameter += $AttrName
-	Save-Resource $resource
+	#Save-Resource $resource
+	return $resource
 }
 
 Function Remove-AttributeFromMpr {
@@ -697,9 +688,12 @@ Function Remove-AttributeFromMpr {
 	#$anchor = @{'DisplayName' = $MprName}
 	#$changes = @(New-FimImportChange -Operation 'Delete' -AttributeName 'ActionParameter' -AttributeValue $AttrName)
 	#New-FimImportObject -ObjectType ManagementPolicyRule -State Put -Anchor $anchor -Changes $changes -ApplyNow
-	$resource = $resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $MprName -AttributesToGet
-	$resource.ActionParameter = $null | Where-Object { $_ -eq $AttrName}
-	Save-Resource $resource
+	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $MprName
+	#$resource.ActionParameter = $null | Where-Object { $_ -eq $AttrName}
+	$tempArray = $resource.ActionParameter -ne $AttrName
+	$resource.ActionParameter = $tempArray
+	#Save-Resource $resource
+	return $resource
 }
 
 Function New-Set {
