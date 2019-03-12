@@ -690,8 +690,8 @@ Function Remove-AttributeFromMpr {
 	#New-FimImportObject -ObjectType ManagementPolicyRule -State Put -Anchor $anchor -Changes $changes -ApplyNow
 	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $MprName
 	#$resource.ActionParameter = $null | Where-Object { $_ -eq $AttrName}
-	$tempArray = $resource.ActionParameter -ne $AttrName
-	$resource.ActionParameter = $tempArray
+	$tempArray = $resource.ActionParameter -ne $AttrName	# temparray without parameter AttrName
+	$resource.ActionParameter = $tempArray					# fill resource with parameters without AttrName
 	#Save-Resource $resource
 	return $resource
 }

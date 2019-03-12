@@ -1,15 +1,12 @@
 <#
 Copyright (C) 2015 by IS4U (info@is4u.be)
-
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation version 3.
-
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
 A full copy of the GNU General Public License can be found
 here: http://opensource.org/licenses/gpl-3.0.
 #>
@@ -21,17 +18,15 @@ if(!(Get-Module -Name LithnetRMA))
 Import-Module LithnetRMA;
 }
 
-#Set-ResourceManagementClient -BaseAddress http://localhost:5725;
+#Set-ResourceManagementClient -BaseAddress $FIMServiceURI;
 #endregion Lithnet
 
 Function New-Person {
 <#
 	.SYNOPSIS
 	Create a new person in the FIM Portal schema.
-
 	.DESCRIPTION
 	Create a new person in the FIM Portal schema.
-
 	.EXAMPLE
 	New-Person -Address "Prins Boudewijnlaan 41" -City Edegem -Country BE -Department "IBM/Imprivata" -DisplayName WDecruy 
 	-Domain FIM -EmailAlias wdecruy -EmployeeId 696969 -EmployeeType Intern -FirstName Wouter -JobTitle "Security Architect" 
@@ -125,10 +120,8 @@ Function Update-Person {
 <#
 	.SYNOPSIS
 	Update a new person in the FIM Portal schema.
-
 	.DESCRIPTION
 	Update a new person in the FIM Portal schema.
-
 	.EXAMPLE
 	Update-Person -DisplayName WDecruy -FirstName Wouter -LastName Decruy
 #>
@@ -227,10 +220,8 @@ Function Remove-Person {
 <#
 	.SYNOPSIS
 	Remove a new person in the FIM Portal schema.
-
 	.DESCRIPTION
 	Remove a new person in the FIM Portal schema.
-
 	.EXAMPLE
 	Remove-Person -DisplayName WDecruy
 #>
@@ -248,10 +239,8 @@ Function New-Attribute {
 <#
 	.SYNOPSIS
 	Create a new attribute in the FIM Portal schema.
-
 	.DESCRIPTION
 	Create a new attribute in the FIM Portal schema.
-
 	.EXAMPLE
 	New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
 #>
@@ -277,6 +266,16 @@ Function New-Attribute {
 		[String]
 		$MultiValued = "False"
 	)
+	<#$changes = @{}
+	$changes.Add("DisplayName", $DisplayName)
+	$changes.Add("Name", $Name)
+	$changes.Add("Description", $Description)
+	$changes.Add("DataType", $Type)
+	$changes.Add("Multivalued", $MultiValued)
+	$attr = New-FimImportObject -ObjectType AttributeTypeDescription -State Create -Changes $changes#> #-ApplyNow -SkipDuplicateCheck -PassThru
+	#[UniqueIdentifier] $id = $attr.TargetObjectIdentifier
+	#return $id
+	#return $attr
 	$obj = New-Resource -ObjectType AttributeTypeDescription
 	$obj.DisplayName = $DisplayName
 	$obj.Name = $Name
@@ -284,8 +283,6 @@ Function New-Attribute {
 	$obj.DataType = $Type
 	$obj.MultiValued = $MultiValued
 	#Save-Resource $obj
-	#$id = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ObjectID
-	#return $id.ObjectID.Value
 	return $obj
 }
 
@@ -293,10 +290,8 @@ Function Update-Attribute {
 <#
 	.SYNOPSIS
 	Update an attribute in the FIM Portal schema.
-
 	.DESCRIPTION
 	Update an attribute in the FIM Portal schema.
-
 	.EXAMPLE
 	Update-Attribute -Name Visa -DisplayName Visa -Description "Visa card number"
 #>
@@ -313,21 +308,26 @@ Function Update-Attribute {
 		[String]
 		$Description
 	)
+	<#$anchor = @{'Name' = $Name}
+	$changes = @{}
+	$changes.Add("DisplayName", $DisplayName)
+	$changes.Add("Description", $Description)
+	New-FimImportObject -ObjectType AttributeTypeDescription -State Put -Anchor $anchor -Changes $changes -ApplyNow
+	[GUID] $id = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name
+	return $id#>
 	$obj = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
 	#Save-Resource $obj
-	return $obj#.ObjectID.Value		## For testing
+	return $obj
 }
 
 Function Remove-Attribute {
 <#
 	.SYNOPSIS
 	Remove an attribute from the FIM Portal schema.
-
 	.DESCRIPTION
 	Remove an attribute from the FIM Portal schema.
-
 	.EXAMPLE
 	Remove-Attribute -Name Visa
 #>
@@ -336,7 +336,7 @@ Function Remove-Attribute {
 		[String]
 		$Name
 	)
-	#This is with pipeline!
+	#Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType AttributeTypeDescription
 	#Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
 	# To be sure we get the correct object the ID gets returned from Get-Resource, this ID will be send with Remove-Resource
 	$id = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
@@ -347,13 +347,10 @@ Function New-Binding {
 <#
 	.SYNOPSIS
 	Create a new attribute binding in the FIM Portal schema.
-
 	.DESCRIPTION
 	Create a new attribute binding in the FIM Portal schema.
-
 	.EXAMPLE
 	New-Binding -AttributeName Visa -DisplayName "Visa Card Number"
-
 	.EXAMPLE
 	New-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
 #>
@@ -378,19 +375,29 @@ Function New-Binding {
 		[String]
 		$ObjectType = "Person"
 	)
-	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName #-AttributesToGet ObjectID
-	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType #-AttributesToGet ObjectID
+	<#$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
+	$objId = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
+	$changes = @{}
+	$changes.Add("Required", $Required)
+	$changes.Add("DisplayName", $DisplayName)
+	$changes.Add("Description", $Description)
+	$changes.Add("BoundAttributeType", $attrId)
+	$changes.Add("BoundObjectType", $objId)
+	$binding = New-FimImportObject -ObjectType BindingDescription -State Create -Changes $changes -ApplyNow -SkipDuplicateCheck -PassThru
+	#[UniqueIdentifier] $id = $binding.TargetObjectIdentifier
+	#return $id
+	return $binding#>
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ID
 	$obj = New-Resource -ObjectType BindingDescription
 	$obj.Required = $Required
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
-	$obj.BoundAttributeType = $attrId#.ObjectID.Value		## For id testing
-	$obj.BoundObjectType = $objId#.ObjectID.Value			## For id testing
+	$obj.BoundAttributeType = $attrId
+	$obj.BoundObjectType = $objId
 	#Save-Resource $obj
-	#$Id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ObjectID
-	#return $obj.ObjectID.Value		## For testing, to get the id of the resource ask for .ObjectID.Value
-	## For Tests
-	$obj.id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName
+	#[GUID]$Id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
+	$obj.id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
 	return $obj
 }
 
@@ -398,13 +405,10 @@ Function Update-Binding {
 <#
 	.SYNOPSIS
 	Update an attribute binding in the FIM Portal schema.
-
 	.DESCRIPTION
 	Update an attribute binding in the FIM Portal schema.
-
 	.EXAMPLE
 	Update-Binding -AttributeName Visa -DisplayName "Visa Card Number"
-
 	.EXAMPLE
 	Update-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
 #>
@@ -429,27 +433,38 @@ Function Update-Binding {
 		[String]
 		$ObjectType = "Person"
 	)
-	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName #-AttributesToGet ObjectID
-	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType #-AttributesToGet ObjectID
-	[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs `
-	@{BoundAttributeType=$attrId<#.ObjectID.Value#>; BoundObjectType=$objId<#.ObjectID.Value#>} #-AttributesToGet ObjectID
+	<#$attrId = Get-FimObjectID -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
+	$objId = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
+	$binding = Get-FimObject -Filter "/BindingDescription[BoundAttributeType='$attrId' and BoundObjectType='$objId']"
+	#[UniqueIdentifier] $id = $binding.ObjectID
+    $id = $binding
+	#$anchor = @{"ObjectID" = $id.Value}
+    $anchor = @{"ObjectID" = $id}
+	$changes = @{}
+	$changes.Add("Required", $Required)
+	$changes.Add("DisplayName", $DisplayName)
+	$changes.Add("Description", $Description)
+	New-FimImportObject -ObjectType BindingDescription -State Put -Anchor $anchor -Changes $changes -ApplyNow
+	#return $id.Value
+	return $id#>
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ID
+	[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
 	#$id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
-	$obj = Get-Resource -ID = $id#.ObjectID.Value
+	$obj = Get-Resource -ID = $id
 	$obj.Required = $Required
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
 	#Save-Resource $obj
-	return $id#.ObjectID.Value		## For testing
+	return $id
 }
 
 Function Remove-Binding {
 <#
 	.SYNOPSIS
 	Remove an attribute binding from the FIM Portal schema.
-
 	.DESCRIPTION
 	Remove an attribute binding from the FIM Portal schema.
-
 	.EXAMPLE
 	Remove-Binding -AttributeName Visa
 #>
@@ -469,10 +484,10 @@ Function Remove-Binding {
     $id = $binding
 	#Remove-FimObject -AnchorName ObjectID -AnchorValue $id.Value -ObjectType BindingDescription
 	Remove-FimObject -AnchorName ObjectID -AnchorValue $id[0] -ObjectType BindingDescription#>
-	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
-	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
-	$id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId<#.ObjectID.Value#>; BoundObjectType=$objId<#.ObjectID.Value#>} #-AttributesToGet ObjectID
-	Remove-Resource -ID $id.ObjectID.Value		## For testing
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ID
+	[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
+	Remove-Resource -ID $id
 }
 
 <# Niet gebruikt voorlopig #>
@@ -480,10 +495,8 @@ Function New-AttributeAndBinding {
 <#
 	.SYNOPSIS
 	Create a new attribute, attribute binding, MPR-config, filter permission, ... in the FIM Portal schema.
-
 	.DESCRIPTION
 	Create a new attribute, attribute binding, MPR-config, filter permission, ... in the FIM Portal schema.
-
 	.EXAMPLE
 	New-AttributeAndBinding -AttrName Visa -DisplayName "Visa Card Number" -Type String
 #>
@@ -527,10 +540,8 @@ Function Remove-AttributeAndBinding {
 <#
 	.SYNOPSIS
 	Remove an attribute, attribute binding, MPR-config, filter permission, ... from the FIM Portal schema.
-
 	.DESCRIPTION
 	Remove an attribute, attribute binding, MPR-config, filter permission, ... from the FIM Portal schema.
-
 	.EXAMPLE
 	Remove-AttributeAndBinding -AttrName Visa
 #>
@@ -557,10 +568,8 @@ Function Import-SchemaAttributesAndBindings {
 <#
 	.SYNOPSIS
 	Create new attributes and bindings based on data in given CSV file.
-
 	.DESCRIPTION
 	Create new attributes and bindings based on data in given CSV file.
-
 	.EXAMPLE
 	Import-SchemaAttributesAndBindings -CsvFile ".\SchemaAttributesAndBindings.csv"
 #>
@@ -585,7 +594,6 @@ Function Import-SchemaBindings {
 	.DESCRIPTION
 	Create new bindings based on data in given CSV file.
 	All referenced attributes are assumed to exist already in the schema.
-
 	.EXAMPLE
 	Import-SchemaBindings -CsvFile ".\SchemaBindings.csv"
 #>
@@ -604,10 +612,8 @@ Function New-ObjectType {
 <#
 	.SYNOPSIS
 	Create a new object type in the FIM Portal schema.
-
 	.DESCRIPTION
 	Create a new object type in the FIM Portal schema.
-
 	.EXAMPLE
 	New-ObjectType -Name Department -DisplayName Department -Description Department
 #>
@@ -636,18 +642,16 @@ Function New-ObjectType {
 	$obj.Name = $Name
 	$obj.Description = $Description
 	#Save-Resource $obj
-	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID #-AttributesToGet ObjectID
-	return $id#.ObjectID.Value
+	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
+	return $id
 }
 
 Function Update-ObjectType {
 <#
 	.SYNOPSIS
 	Update the object type in the FIM Portal schema.
-
 	.DESCRIPTION
 	Update the object type in the FIM Portal schema.
-
 	.EXAMPLE
 	Update-ObjectType -Name Department -DisplayName Department -Description Department
 #>
@@ -664,23 +668,27 @@ Function Update-ObjectType {
 		[String]
 		$Description
 	)
-	$obj = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name
+	<#$anchor = @{'Name' = $name}
+	$changes = @{}
+	$changes.Add("DisplayName", $DisplayName)
+	$changes.Add("Description", $Description)
+	New-FimImportObject -ObjectType ObjectTypeDescription -State Put -Anchor $anchor -Changes $changes -ApplyNow
+	[GUID] $id = Get-FimObjectID -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name
+	return $id#>
+	$obj = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name 
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
 	#Save-Resource $obj
-	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID	# Dit wordt vervangen
-	return $id	# Dit wordt vervangen
-	#return $obj.ObjectID.Value
+	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
+	return $id
 }
 
 Function Remove-ObjectType {
 <#
 	.SYNOPSIS
 	Remove an object type from the FIM Portal schema.
-
 	.DESCRIPTION
 	Remove an object type from the FIM Portal schema.
-
 	.EXAMPLE
 	Remove-ObjectType -Name Department
 #>
@@ -699,12 +707,10 @@ Function New-ObjectTypeConfiguration {
 <#
 	.SYNOPSIS
 	Create a new object type configuration.
-
 	.DESCRIPTION
 	Create a new object type based on the given config file.
 	This includes creating a new object type, a MPR, default attributes and bindings,
 	search scope, a navigation bar resource and configuring a synchronization fiter.
-
 	.EXAMPLE
 	New-ObjectTypeConfiguration -ConfigFile .\newObject.xml
 #>
