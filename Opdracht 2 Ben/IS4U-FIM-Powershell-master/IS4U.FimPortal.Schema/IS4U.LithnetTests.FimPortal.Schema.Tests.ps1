@@ -347,18 +347,18 @@ Describe "Remove-Binding" {
         }
         It "Get-Resource uses correct parameters for variable attrId" {
             Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $ObjectType -eq "AttributeTypeDescription" -and $AttributeValue -eq "Visa" -and $AttributesToGet -eq "ObjectID"
+                $ObjectType -eq "AttributeTypeDescription" -and $AttributeValue -eq "Visa" -and $AttributesToGet -eq "ObjectID"     ##Previously ID
             } -Exactly 1
         }
         It "Get-Resource uses correct parameters for variable objId" {
             Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $ObjectType -eq "ObjectTypeDescription" -and $AttributeValue -eq "Person" -and $AttributesToGet -eq "ObjectID"
+                $ObjectType -eq "ObjectTypeDescription" -and $AttributeValue -eq "Person" -and $AttributesToGet -eq "ObjectID"  ##Previously ID
             } -Exactly 1
         }
         It "Get-Resource uses correct parameters for variable id" {
             Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
                 $ObjectType -eq "BindingDescription" -and $AttributeValuePairs.BoundAttributeType -eq "ecc0daa1-2d1e-4b7c-aa69-df3b2ff2862d" `
-                -and $AttributeValuePairs.BoundObjectType -eq "ecc0daa1-2d1e-4b7c-aa69-df3b2ff2862d" -and $AttributesToGet -eq "ObjectID"
+                -and $AttributeValuePairs.BoundObjectType -eq "ecc0daa1-2d1e-4b7c-aa69-df3b2ff2862d" -and $AttributesToGet -eq "ObjectID"   ##Previously ID
             } -Exactly 1
         }
         It "Remove-Resource uses correct parameters" {
@@ -418,7 +418,7 @@ Describe "New-ObjectType" {
                 $ObjectType -eq "ObjectTypeDescription"
                 $AttributeName | Should be "Name"
                 $AttributeValue | Should be "Department"
-                $AttributesToGet | Should be "ObjectID"
+                $AttributesToGet | Should be "ObjectID"     ##Previously ID
             }
         }
         It "New-ObjectType returns a GUID" {

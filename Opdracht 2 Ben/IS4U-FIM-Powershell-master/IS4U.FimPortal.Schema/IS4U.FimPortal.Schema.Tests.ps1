@@ -28,14 +28,14 @@ Describe "New-Attribute" {
         }
         
         It "Parameters get saved into object (Name, DisplayName, Type (mandatory), Description, MultiValued (Optional)" {
-            Write-Host($result.changes)
+            #Write-Host($result.changes)    ## This is just to check what changes contained
             Assert-MockCalled New-FimImportObject -ParameterFilter{
                 $changes["Name"] -eq "Visa" -and $changes["DisplayName"] -eq "Visa" -and $changes["DataType"] -eq "String"
             } -ModuleName "IS4U.FimPortal.Schema"
         }
 
         It "Return correct object" {
-            Write-Host($result[2].Values)
+            #Write-Host($result[2].Values)  ## This is just to check certain values
             $result[0] -eq "AttributeTypeDescription" -and $result[1] -eq "Create" -and $result[2]["Name"] -eq "Visa" | Should be $true
         }
     }
