@@ -101,7 +101,7 @@ Function New-Person {
 		$RasAccessPermission = $False
 	)
 
-	$person = New-Resource -ObjectType User
+	$person = New-Resource -ObjectType Person	## In the real environment -ObjectType should be Person because User is the DisplayName
 	$person.Address = $Address
 	$person.City = $City
 	$person.Country = $Country
@@ -198,28 +198,13 @@ Function Update-Person {
 	
 	<#
 		PSBoundparameter is used so that only the parameters that get send will be used to update the User's atrributes!
+		## In the real environment -ObjectType should be Person because User is the DisplayName
 	#>
-	$global:person = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName
+	$global:person = Get-Resource -ObjectType Person -AttributeName DisplayName -AttributeValue $DisplayName
 	foreach ($boundparam in $PSBoundParameters.GetEnumerator()) {
 		$global:person.($boundparam.Key) = $boundparam.Value
 	}
-	<#$person = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName
-	$person.Address = $Address
-	$person.City = $City
-	$person.Country = $Country
-	$person.Department = $Department
-	$person.DisplayName = $DisplayName
-	$person.Domain = $Domain
-	$person.EmailAlias = $EmailAlias
-	$person.EmployeeId = $EmployeeId
-	$person.EmployeeType = $EmployeeType
-	$person.FirstName = $FirstName
-	$person.JobTitle = $JobTitle
-	$person.LastName = $LastName
-	$person.OfficePhone = $OfficePhone
-	$person.PostalCode = $PostalCode
-	$person.RasAccessPermission = $RasAccessPermission
-	#Save-Resource $person#>
+	#Save-Resource $person
 	return $person
 }
 
@@ -239,9 +224,10 @@ Function Remove-Person {
 		[String]
 		$DisplayName
 	)
-
-	$id = Get-Resource -ObjectType User -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
-	Remove-Resource -ID $id
+	##This is with pipeline and works in the real environment + -ObjectType must be changed into Person because User is the DisplayName
+	#Get-Resource -ObjectType Person -AttributeName DisplayName -AttributeValue $DisplayName | Remove-Resource
+	$id = Get-Resource -ObjectType Person -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ObjectID
+	Remove-Resource -ID $id.ObjectID.Value
 }
 
 Function New-Attribute {
@@ -285,7 +271,7 @@ Function New-Attribute {
 	$obj.MultiValued = $MultiValued
 	#Save-Resource $obj
 	#$id = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ObjectID
-	#return $id.ObjectID.Value
+	#return $id.ObjectID.Value		## For testing, .ObjectID.Value is for real environment
 	return $obj
 }
 
@@ -317,7 +303,7 @@ Function Update-Attribute {
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
 	#Save-Resource $obj
-	return $obj#.ObjectID.Value		## For testing
+	return $obj#.ObjectID.Value		## For testing, .ObjectID.Value is for real environment
 }
 
 Function Remove-Attribute {
@@ -336,11 +322,11 @@ Function Remove-Attribute {
 		[String]
 		$Name
 	)
-	#This is with pipeline!
+	#This is with pipeline and works in real environment!
 	#Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
 	# To be sure we get the correct object the ID gets returned from Get-Resource, this ID will be send with Remove-Resource
 	$id = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
-	Remove-Resource -ID $id
+	Remove-Resource -ID $id.ObjectID.Value
 }
 
 Function New-Binding {
@@ -384,11 +370,11 @@ Function New-Binding {
 	$obj.Required = $Required
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
-	$obj.BoundAttributeType = $attrId#.ObjectID.Value		## For id testing
-	$obj.BoundObjectType = $objId#.ObjectID.Value			## For id testing
+	$obj.BoundAttributeType = $attrId#.ObjectID.Value		## For id testing in real environment
+	$obj.BoundObjectType = $objId#.ObjectID.Value			## For id testing in real environment
 	#Save-Resource $obj
 	#$Id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ObjectID
-	#return $obj.ObjectID.Value		## For testing, to get the id of the resource ask for .ObjectID.Value
+	#return $obj.ObjectID.Value		## For testing, to get the id of the resource ask for .ObjectID.Value (in real environment)
 	## For Tests
 	$obj.id = Get-Resource -ObjectType BindingDescription -AttributeName DisplayName -AttributeValue $DisplayName
 	return $obj
@@ -429,17 +415,17 @@ Function Update-Binding {
 		[String]
 		$ObjectType = "Person"
 	)
-	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName #-AttributesToGet ObjectID
-	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType #-AttributesToGet ObjectID
-	[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs `
-	@{BoundAttributeType=$attrId<#.ObjectID.Value#>; BoundObjectType=$objId<#.ObjectID.Value#>} #-AttributesToGet ObjectID
-	#$id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
-	$obj = Get-Resource -ID = $id#.ObjectID.Value
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ObjectID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ObjectID
+	$id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs `
+	@{BoundAttributeType=$attrId.ObjectID.Value; BoundObjectType=$objId.ObjectID.Value} -AttributesToGet ObjectID
+	#[UniqueIdentifier] $id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId; BoundObjectType=$objId} -AttributesToGet ID
+	$obj = Get-Resource -ID = $id.ObjectID.Value
 	$obj.Required = $Required
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
 	#Save-Resource $obj
-	return $id#.ObjectID.Value		## For testing
+	return $id.ObjectID.Value		## For testing
 }
 
 Function Remove-Binding {
@@ -469,9 +455,9 @@ Function Remove-Binding {
     $id = $binding
 	#Remove-FimObject -AnchorName ObjectID -AnchorValue $id.Value -ObjectType BindingDescription
 	Remove-FimObject -AnchorName ObjectID -AnchorValue $id[0] -ObjectType BindingDescription#>
-	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName
-	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType
-	$id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId<#.ObjectID.Value#>; BoundObjectType=$objId<#.ObjectID.Value#>} #-AttributesToGet ObjectID
+	$attrId = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $AttributeName -AttributesToGet ObjectID
+	$objId = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $ObjectType -AttributesToGet ObjectID
+	$id = Get-Resource -ObjectType BindingDescription -AttributeValuePairs @{BoundAttributeType=$attrId.ObjectID.Value; BoundObjectType=$objId.ObjectID.Value} -AttributesToGet ObjectID
 	Remove-Resource -ID $id.ObjectID.Value		## For testing
 }
 
@@ -636,8 +622,8 @@ Function New-ObjectType {
 	$obj.Name = $Name
 	$obj.Description = $Description
 	#Save-Resource $obj
-	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID #-AttributesToGet ObjectID
-	return $id#.ObjectID.Value
+	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ObjectID	# used to be -AttributesToGet ID
+	return $id.ObjectID.Value
 }
 
 Function Update-ObjectType {
@@ -668,12 +654,12 @@ Function Update-ObjectType {
 	$obj.DisplayName = $DisplayName
 	$obj.Description = $Description
 	#Save-Resource $obj
-	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID	# Dit wordt vervangen
-	return $id	# Dit wordt vervangen
-	#return $obj.ObjectID.Value
+	#$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID	# Dit wordt vervangen
+	#return $id	# Dit wordt vervangen
+	return $obj.ObjectID.Value
 }
 
-Function Remove-ObjectType {
+Function Remove-ObjectType {		## No rights to remove an ObjectType, only admins can do this!
 <#
 	.SYNOPSIS
 	Remove an object type from the FIM Portal schema.
@@ -690,9 +676,10 @@ Function Remove-ObjectType {
 		$Name
 	)
 	#Remove-FimObject -AnchorName Name -AnchorValue $Name -ObjectType ObjectTypeDescription
+	#This is with pipeline and works in real environment
 	#Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
-	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ID
-	Remove-Resource -ID $id
+	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ObjectID #-AttributesToGet ID
+	Remove-Resource -ID $id.ObjectID.Value
 }
 
 Function New-ObjectTypeConfiguration {
