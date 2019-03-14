@@ -130,7 +130,7 @@ Describe "New-Attribute" {
                 Description = ""
                 DataType = "" 
                 MultiValued = ""
-            }
+        }
         return $test
     } -ModuleName "IS4U.FimPortal.Schema"
     # Save-Resource can not be mocked when the required parameter is not of RmaObject type.

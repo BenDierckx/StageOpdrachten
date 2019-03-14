@@ -269,10 +269,10 @@ Function New-Attribute {
 	$obj.Description = $Description
 	$obj.DataType = $Type
 	$obj.MultiValued = $MultiValued
-	#Save-Resource $obj
+	#Save-Resource $obj				## Is for real environment
 	#$id = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ObjectID
 	#return $id.ObjectID.Value		## For testing, .ObjectID.Value is for real environment
-	return $obj
+	return $obj		## For testing purposes
 }
 
 Function Update-Attribute {
