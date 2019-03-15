@@ -476,7 +476,7 @@ Function New-Mpr {
 		}
 	}
 	#Save-Resource $resource
-	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
+	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID	##-AttributeToGet ObjectID
 	#return $id
 	return $resource  # For testing
 }
@@ -563,7 +563,7 @@ Function Update-Mpr {
 		$global:resource.($boundparam.key) = $boundparam.value				#Variable
 	}
 	#Save-Resource $resource
-	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
+	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID ##-AttributesToGet ObjectID
 	#return $id
 	return $resource
 }
@@ -582,7 +582,7 @@ Function Remove-Mpr {
 		$DisplayName
 	)
 	#Remove-FimObject -AnchorName DisplayName -AnchorValue $DisplayName -ObjectType ManagementPolicyRule
-	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID
+	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID ##-AttributeToGet ObjectID
 	Remove-Resource -ID $id
 }
 
