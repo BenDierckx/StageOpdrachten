@@ -75,7 +75,7 @@ RequiredModules = @(@{ModuleName = 'FimPowershellModule'; ModuleVersion = '2.2'}
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = ''
+FunctionsToExport = 'Write-ToXmlFile', 'Get-SchemaConfig'
 
 # Cmdlets to export from this module
 CmdletsToExport = ''
