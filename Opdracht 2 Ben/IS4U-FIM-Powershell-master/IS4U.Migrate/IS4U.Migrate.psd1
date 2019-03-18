@@ -56,8 +56,8 @@ here: http://opensource.org/licenses/gpl-3.0.'
 # ProcessorArchitecture = ''
 
 # Modules that must be imported into the global environment prior to importing this module
-RequiredModules = @(@{ModuleName = 'FimPowershellModule'; ModuleVersion = '2.2'}, @{ ModuleName = 'IS4U'; ModuleVersion = '1.0'},
-@{ModuleName = 'IS4U.FimPortal.Schema'; ModuleVersion = '1.0'}, @{ ModuleName = 'IS4U.FimPortal'; ModuleVersion = '1.0'})
+<#RequiredModules = @(@{ModuleName = 'FimPowershellModule'; ModuleVersion = '2.2'}, @{ ModuleName = 'IS4U'; ModuleVersion = '1.0'},
+@{ModuleName = 'IS4U.FimPortal.Schema'; ModuleVersion = '1.0'}, @{ ModuleName = 'IS4U.FimPortal'; ModuleVersion = '1.0'})#>
 
 # Assemblies that must be loaded prior to importing this module
 # RequiredAssemblies = @()

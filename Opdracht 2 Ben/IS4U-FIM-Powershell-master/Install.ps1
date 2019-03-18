@@ -28,5 +28,6 @@ if($admin -eq $false) {
 	Copy-Item (Join-Path $dir ".\IS4U.FimPortal.Rcdc") "$Env:ProgramFiles\WindowsPowerShell\Modules" -Recurse -Force
 	Copy-Item (Join-Path $dir ".\IS4U.FimPortal.Schema") "$Env:ProgramFiles\WindowsPowerShell\Modules" -Recurse -Force
 	Copy-Item (Join-Path $dir ".\IS4U.FimPortal.Sspr") "$Env:ProgramFiles\WindowsPowerShell\Modules" -Recurse -Force
+	Copy-Item (Join-Path $dir ".\IS4U.Migrate") "$Env:ProgramFiles\WindowsPowerShell\Modules" -Recurse -Force
 }
 Write-Host "Modules successfully deployed."

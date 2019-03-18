@@ -10,16 +10,19 @@ Describe "Write-ToXmlFile" {
                 Name = "Testing"
                 DisplayName = "TestingDisplay"
                 Test = "final"
+                ObjectID = "e0596263-8f1c-4ab1-8415-d73a1bedc222"
                 },
                 [PsCustomObject] @{
                 Name = "Testing3"
                 DisplayName = "TestingDisplay2"
                 Test = "Final2"
+                BoundAttributeType = "e0596263-8f1c-4ab1-8415-d73a1bedc222"
+                ObjectID = New-Guid
                 }
             )
             return $obj
         } -ModuleName "IS4U.Migrate"
-        Write-ToXmlFile -ObjectType AttributeTypeDescription -Target Source
+        Write-ToXmlFile -ObjectType AttributeTypeDescription
         It "Search-Resources gets called using correct parameter" {
             Assert-MockCalled Search-Resources -ModuleName "IS4U.Migrate" -ParameterFilter {
                 $XPath -eq "/AttributeTypeDescription"
@@ -28,7 +31,7 @@ Describe "Write-ToXmlFile" {
         }
         It "Write-ToXmlFile creates a xml file" {
             $file = ".\SourceAttributeTypeDescription.xml"
-            $file | Should -Exist
+            $file | Should Exist
         }
     }
 }
@@ -45,7 +48,7 @@ Describe "Get-SchemaConfig" {
         }
         It "Get-SchemaConfig creates a xml file" {
             $file = ".\SchemaConfigSource.xml"
-            $file | Should -Exist
+            $file | Should Exist
         }
     }
 }
@@ -63,3 +66,5 @@ Describe "Get-SchemaConfig" {
     - Delta vergelijkt de 2
     - Delta met import-RmConfig (-preview om te zien wat er zou veranderen)
 #>
+
+# Set-ExecutionPolicy -Scope Process Unrestricted

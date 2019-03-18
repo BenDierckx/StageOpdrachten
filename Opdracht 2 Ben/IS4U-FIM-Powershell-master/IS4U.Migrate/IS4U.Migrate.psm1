@@ -24,8 +24,14 @@ Import-Module LithnetRMA;
 #endregion Lithnet
 
 Function Start-Migration {
-    Param(    
+    Param(
+        # Target Name
+        [Parameter(Mandatory=$False)]
+        [String]
+        $TargetName
     )
+
+    Get-SchemaConfig -TargetName $TargetName
 }
 
 Function Write-ToXmlFile {
@@ -44,9 +50,6 @@ Function Write-ToXmlFile {
     .PARAMETER AnchorName
     Specify the anchor name when a different anchor is used
 
-    .PARAMETER Target
-    Specify if the xml that gets written comes from the source or the target MIM setup
-
     .EXAMPLE
     Write-ToXmlFile -ObjectType AttributeTypeDescription
     #>
@@ -55,10 +58,9 @@ Function Write-ToXmlFile {
         [String]
         $ObjectType,
 
-        [Parameter(Mandatory=$True)]
-        [string]
-        [ValidateScript({("Source", "Destination") -contains $_})]
-        $Target,
+        [Parameter(Mandatory=$false)]
+        [String]
+        $TargetName,
 
         [Parameter(Mandatory=$False)]
         [String]
@@ -68,13 +70,12 @@ Function Write-ToXmlFile {
     $FileName = "configurationTemplate.xml"
     $XmlDoc = [System.Xml.XmlDocument] (Get-Content $FileName)
     $node = $XmlDoc.SelectSingleNode('//Operations')
-
     # Get all the objects from the MIM
-    $AllAttrObjects = Search-Resources -Xpath "/$ObjectType" -ExpectedObjectType $ObjectType
+    $AllObjects = Search-Resources -Xpath "/$ObjectType" -ExpectedObjectType $ObjectType
 
     # Place object in XML file
     # Iterate over the array of PsCustomObjects from Search-Resources
-    foreach($obj in $AllAttrObjects) {
+    foreach($obj in $AllObjects) {
         # Operation description
         $xmlElement = $XmlDoc.CreateElement("ResourceOperation")
         $XmlOperation = $node.AppendChild($xmlElement)
@@ -93,52 +94,77 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
-            # ObjectType already gets used in the operation description so skip it
-            if ($member.Name -eq "ObjectType") { continue }
+            if ($member.Name -eq "usageKeyword") {
+                foreach ($m in $member.Value) {
+                    $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
+                    $xmlVarElement.Set_InnerText($m.Value)
+                    $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                    $xmlVariable.SetAttribute("operation", "replace") 
+                    $xmlVariable.SetAttribute("name", $member.Name)
+                }
+            }
+            # Attributes that are read only do not get implemented in the xml file
+            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+             "ExpectedRulesList", "ResourceTime")
+            # Skip read only attributes and ObjectType (already used in ResourceOperation)
+            if ($illegalMembers -contains $member.Name) { continue }
+            # referencing purposes, no need in the attributes itself (Lithnet does this)
+            if ($member.Name -eq "ObjectID") {
+                # set the objectID of the object as the id of the xml node
+                $XmlOperation.SetAttribute("id", $member.Value)
+                continue # Import-RmConfig creates an objectID in the new setup
+            }
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
             $xmlVarElement.Set_InnerText($member.Value)
             $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-            $xmlVariable.SetAttribute("Operation", "add") #Add of replace?
-            $xmlVariable.SetAttribute("Name", $member.Name)
+            $xmlVariable.SetAttribute("operation", "replace") #Add of replace?
+            $xmlVariable.SetAttribute("name", $member.Name)
+            if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
+                $xmlVariable.SetAttribute("type", "xmlref")
+            }
         }
     }
     # Save the xml in a seperate xml file 
-    $XmlDoc.Save(".\IS4U.Migrate\$Target$ObjectType.xml")
+    $XmlDoc.Save(".\IS4U.Migrate\$ObjectType$TargetName.xml")
     # Confirmation
     Write-Host "Written objects of $ObjectType"
     # Return the new xml 
     #[xml]$result = $XmlDoc | Select-Xml -XPath "//ResourceOperation[@resourceType='$ObjectType']"
-    [xml]$result = [System.Xml.XmlDocument] (Get-Content ".\$Target$ObjectType.xml")
-    return $result
+    #[xml]$result = [System.Xml.XmlDocument] (Get-Content ".\$ObjectType.xml")
+    #return $result
 }
 
 Function Get-SchemaConfig {
-    param (
-        [Parameter(Mandatory=$true)]
-        [string]
-        [ValidateScript({("Source", "Destination") -contains $_})]
-        $Target
+    param(
+        # Name of the target (source or destination)
+        [Parameter(Mandatory=$False)]
+        [String]
+        $TargetName
     )
     # Write xml files and return the xml (of filepaths?) !!
-    [xml]$xmlForAttributes = Write-ToXmlFile -ObjectType AttributeTypeDescription -Target $Target
-    [xml]$xmlForObjects = Write-ToXmlFile -ObjectType ObjectTypeDescription -Target $Target
-    [xml]$xmlForBindings = Write-ToXmlFile -ObjectType BindingDescription -Target $Target
+    Write-ToXmlFile -ObjectType AttributeTypeDescription -TargetName $TargetName
+    [xml]$xmlForAttributes = Get-Content ".\AttributeTypeDescription$TargetName.xml"
+    Write-ToXmlFile -ObjectType ObjectTypeDescription  -TargetName $TargetName
+    [xml]$xmlForObjects = Get-Content ".\ObjectTypeDescription$TargetName.xml"
+    Write-ToXmlFile -ObjectType BindingDescription -TargetName $TargetName
+    [xml]$xmlForBindings = Get-Content ".\BindingDescription$TargetName.xml"
     # configurationTemplate.xml as base file
     [xml]$schemaConfig = Get-Content configurationTemplate.xml
-    # Add the returns of Write-ToXmlFile to $schemaConfig
+    # Add the returns of Write-ToXmlFile to $schemaConfig xml
     #aparte functie voor foreach?
-    foreach($Node in $xmlForAttributes.'Lithnet.ResourceManagement.ConfigSync'.ChildNodes) {
+    foreach($Node in $xmlForAttributes.SelectSingleNode('//Operations').ChildNodes) {
         # Importnode($Node, $true): the $true means that argument 'Deep' is enabled
         # Deep makes sure the descendants of the node get copied aswell
-        $schemaConfig.'Lithnet.ResourceManagement.ConfigSync'.Operations.AppendChild($schemaConfig.ImportNode($Node, $true))
+        $schemaConfig.SelectSingleNode('//Operations').AppendChild($schemaConfig.ImportNode($Node, $true))
     }
-    foreach ($Node in $xmlForObjects.'Lithnet.ResourceManagement.ConfigSync'.ChildNodes) {
-        $schemaConfig."Lithnet.ResourceManagement.ConfigSync".Operations.AppendChild($schemaConfig.ImportNode($Node, $true))
+    foreach ($Node in $xmlForObjects.SelectSingleNode('//Operations').ChildNodes) {
+        $schemaConfig.SelectSingleNode('//Operations').AppendChild($schemaConfig.ImportNode($Node, $true))
     }
-    foreach ($Node in $xmlForBindings.'Lithnet.ResourceManagement.ConfigSync'.ChildNodes) {
-        $schemaConfig."Lithnet.ResourceManagement.ConfigSync".Operations.AppendChild($schemaConfig.ImportNode($Node, $true))
+    foreach ($Node in $xmlForBindings.SelectSingleNode('//Operations').ChildNodes) {
+        $schemaConfig.SelectSingleNode('//Operations').AppendChild($schemaConfig.ImportNode($Node, $true))
     }
-    $schemaConfig.Save("IS4U-FIM-Powershell-master\IS4U.Migrate\SchemaConfig$Target.xml")
+    $schemaConfig.Save("IS4U.Migrate\SchemaConfig$TargetName.xml")
+    Write-Host "Schema configuration has been written to xml"
     return $schemaConfig
     #[xml]$config = Get-Content SchemaConfig.xml
     #return $config
@@ -160,10 +186,24 @@ Function Write-ChangesToNewConfig {
 
 Function Compare-XmlFiles {
 # Vergelijken van bron xml met target xml of andere file type
-}
+    param (
+        # Target
+        [Parameter(Mandatory=$True)]
+        [String]
+        $TargetName
+    )
+    # Differences in the destination xml against source
+    Compare-Object (Get-Content ".\SchemaConfig.xml") (Get-Content ".\Schemaconfig$TargetName.xml") |
+    Where-Object{ $_.SideIndicator -eq "=>"} |
+    ForEach-Object {Write-host $_.InputObject}
+    # Differences in the source xml against destination
+    Compare-Object (Get-Content ".\SchemaConfig.xml") (Get-Content ".\Schemaconfig$TargetName.xml") |
+    Where-Object{ $_.SideIndicator -eq "<="} |
+    ForEach-Object {Write-host $_.InputObject}
 
-Function New-Delta {
-# aanmaken van xml met de verschillen uit Compare-XmlFiles
+    Compare-Object (Get-Content ".\SchemaConfig.xml") (Get-Content ".\Schemaconfig$TargetName.xml") |
+    Where-Object{ $_.SideIndicator -eq "="} |
+    ForEach-Object {Write-host $_.InputObject}
 }
 
 Function Import-Delta {
@@ -197,10 +237,10 @@ Function Import-Delta {
     )
     try{
         if ($DeltaConfigFilePath) {
-            Import-RMConfig $DeltaConfigFilePath
+            Import-RMConfig $DeltaConfigFilePath -Preview -Verbose
         } elseif ($DeltaSeperateConfigFilePaths) {
             foreach($file in $DeltaSeperateConfigFilePaths){
-                Import-RMConfig $file
+                Import-RMConfig $file -Preview -Verbose
             }
         } else {
             Write-Host "No config file(s) given, import canceled."
