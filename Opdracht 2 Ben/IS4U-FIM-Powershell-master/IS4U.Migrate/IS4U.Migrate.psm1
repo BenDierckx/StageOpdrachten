@@ -35,7 +35,7 @@ Function Start-Migration {
 }
 
 Function Write-ToXmlFile {
-    <#
+    <# Moet worden herschreven om het juiste object te lezen en de gepaste file te saven
     .SYNOPSIS
     Writes a MIM object to a xml-file
     
@@ -97,9 +97,9 @@ Function Write-ToXmlFile {
             if ($member.Name -eq "usageKeyword") {
                 foreach ($m in $member.Value) {
                     $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
-                    $xmlVarElement.Set_InnerText($m.Value)
+                    $xmlVarElement.Set_InnerText($m)
                     $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                    $xmlVariable.SetAttribute("operation", "replace") 
+                    $xmlVariable.SetAttribute("operation", "add") # add because we don't want to replace the items 
                     $xmlVariable.SetAttribute("name", $member.Name)
                 }
             }
@@ -135,6 +135,7 @@ Function Write-ToXmlFile {
 }
 
 Function Get-SchemaConfig {
+    # Hierbij wordt alles in een xmlfile gestoken => herschrijven om naar een csv of .. te schrijven
     param(
         # Name of the target (source or destination)
         [Parameter(Mandatory=$False)]
@@ -165,7 +166,7 @@ Function Get-SchemaConfig {
     }
     $schemaConfig.Save("IS4U.Migrate\SchemaConfig$TargetName.xml")
     Write-Host "Schema configuration has been written to xml"
-    return $schemaConfig
+    #return $schemaConfig
     #[xml]$config = Get-Content SchemaConfig.xml
     #return $config
 }
@@ -185,25 +186,27 @@ Function Write-ChangesToNewConfig {
 }
 
 Function Compare-XmlFiles {
-# Vergelijken van bron xml met target xml of andere file type
+# Te omslachtig om de 2 xml files te vergelijken => elke node vergelijken met alle nodes van andere xml
+# Gaat ook te lang duren om alles dan te automatiseren en in 1 keer te laten verlopen
+# Bij compare-object krijg je alleen maar 1 lijn terug, dus niet voldoende informatie over waar het in zit
     param (
         # Target
         [Parameter(Mandatory=$True)]
         [String]
         $TargetName
     )
-    # Differences in the destination xml against source
-    Compare-Object (Get-Content ".\SchemaConfig.xml") (Get-Content ".\Schemaconfig$TargetName.xml") |
-    Where-Object{ $_.SideIndicator -eq "=>"} |
-    ForEach-Object {Write-host $_.InputObject}
-    # Differences in the source xml against destination
-    Compare-Object (Get-Content ".\SchemaConfig.xml") (Get-Content ".\Schemaconfig$TargetName.xml") |
-    Where-Object{ $_.SideIndicator -eq "<="} |
-    ForEach-Object {Write-host $_.InputObject}
+    [xml]$sourceXml = Get-Content ".\SchemaConfig.xml"
+    [xml]$targetXml = Get-Content ".\SchemaConfig$TargetName.xml"
 
-    Compare-Object (Get-Content ".\SchemaConfig.xml") (Get-Content ".\Schemaconfig$TargetName.xml") |
-    Where-Object{ $_.SideIndicator -eq "="} |
-    ForEach-Object {Write-host $_.InputObject}
+    foreach ($SNode in $sourceXml.SelectNodes("//ResourceOperation")) {
+        foreach ($TNode in $targetXml.SelectNodes("//ResourceOperation")) {
+            if ($Tnode -eq $SNode) {
+                Write-Host $TNode
+            } else {
+                Write-Host $SNode
+            }
+        }
+    }
 }
 
 Function Import-Delta {
@@ -235,20 +238,13 @@ Function Import-Delta {
         [array]
         $DeltaSeperateConfigFilePaths
     )
-    try{
-        if ($DeltaConfigFilePath) {
-            Import-RMConfig $DeltaConfigFilePath -Preview -Verbose
-        } elseif ($DeltaSeperateConfigFilePaths) {
-            foreach($file in $DeltaSeperateConfigFilePaths){
-                Import-RMConfig $file -Preview -Verbose
-            }
-        } else {
-            Write-Host "No config file(s) given, import canceled."
+    if ($DeltaConfigFilePath) {
+        Import-RMConfig $DeltaConfigFilePath -Preview -Verbose
+    } elseif ($DeltaSeperateConfigFilePaths) {
+        foreach($file in $DeltaSeperateConfigFilePaths){
+            Import-RMConfig $file -Preview -Verbose
         }
-    } Catch {
-        Write-Host "Something went wrong, check config file paths and if they are available:"
-        Write-Host "config file: $DeltaConfigFilePath"
-        Write-Host "config files: $DeltaSeperateConfigFilePaths"
-        Break
+    } else {
+        Write-Host "No config file(s) given, import canceled."
     }
 }
