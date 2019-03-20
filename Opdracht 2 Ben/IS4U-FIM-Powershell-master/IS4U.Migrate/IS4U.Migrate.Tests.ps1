@@ -2,54 +2,29 @@ Import-Module IS4U.Migrate
 
 # Set-ExecutionPolicy -Scope Process Unrestricted
 
-Describe "Write-ToXmlFile" {
+Describe "Write-ToCsv" {
     Context "With parameter" {
-        Mock Search-Resources {
-            $obj = @(
-                [PsCustomObject] @{
-                Name = "Testing"
-                DisplayName = "TestingDisplay"
-                Test = "final"
-                ObjectID = "e0596263-8f1c-4ab1-8415-d73a1bedc222"
-                },
-                [PsCustomObject] @{
-                Name = "Testing3"
-                DisplayName = "TestingDisplay2"
-                Test = "Final2"
-                BoundAttributeType = "e0596263-8f1c-4ab1-8415-d73a1bedc222"
-                ObjectID = New-Guid
-                }
-            )
-            return $obj
-        } -ModuleName "IS4U.Migrate"
-        Write-ToXmlFile -ObjectType AttributeTypeDescription
-        It "Search-Resources gets called using correct parameter" {
-            Assert-MockCalled Search-Resources -ModuleName "IS4U.Migrate" -ParameterFilter {
-                $XPath -eq "/AttributeTypeDescription"
-                $ExpectedObjectType | Should be "AttributeTypeDescription"
-            }
+        $obj1 = [PSCustomObject]@{
+            Name = "Test1"
+            Value = "test1"
         }
-        It "Write-ToXmlFile creates a xml file" {
-            $file = ".\SourceAttributeTypeDescription.xml"
-            $file | Should Exist
+        $obj2 = [PSCustomObject]@{
+            Name = "Test2"
+            Value = "test2"
         }
-    }
-}
-
-Describe "Get-SchemaConfig" {
-    Mock Write-ToXmlFile {
-        $file = Get-Content .\SourceAttributeTypeDescription.xml
-        return $file
-    } -ModuleName "IS4U.Migrate"
-    Context "With existing xml file" {
-        Get-SchemaConfig
-        it "Write-ToXmlFile gets called 3 times" {
-            Assert-MockCalled Write-ToXmlFile -ModuleName "IS4U.Migrate" -Exactly 3
+        $obj3 = [PSCustomObject]@{
+            Name = "Test3"
+            Value = "test3"
         }
-        It "Get-SchemaConfig creates a xml file" {
-            $file = ".\SchemaConfigSource.xml"
-            $file | Should Exist
+        $obj4 = [PSCustomObject]@{
+            Name = "Test4"
+            Value = "test4"
         }
+        $objs = @($obj1, $obj2, $obj3, $obj4)
+        Write-Host $objs
+        Write-ToCsv -Objects $objs -CsvName "Testing"
+        $result = Get-ObjectsFromCsv -CsvFilePath "CsvConfigTesting.csv"
+        Write-Host $result
     }
 }
 

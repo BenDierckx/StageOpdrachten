@@ -75,7 +75,7 @@ here: http://opensource.org/licenses/gpl-3.0.'
 # NestedModules = @()
 
 # Functions to export from this module
-FunctionsToExport = 'Write-ToXmlFile', 'Get-SchemaConfig', 'Compare-XmlFiles'
+FunctionsToExport = 'Start-Migration', 'Get-AllObjectsFromCsvs', 'Get-SchemaConfig', 'Get-PolicyConfig', 'Get-PortalConfig', 'Get-ObjectsFromConfig', 'Write-ToCsv', 'Get-ObjectsFromCsv', 'Compare-XmlFiles', 'Write-ToXmlFile', 'Import-Delta'
 
 # Cmdlets to export from this module
 CmdletsToExport = ''
