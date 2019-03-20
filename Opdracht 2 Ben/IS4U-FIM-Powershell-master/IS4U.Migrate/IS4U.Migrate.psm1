@@ -34,10 +34,9 @@ Function Start-Migration {
         Get-SchemaConfig -Source $true
         Get-PortalConfig -Source $true
         Get-PolicyConfig -Source $true
-    }
-    else {
-        [ArrayList]$SourceObjects = Get-AllObjectsFromCsvs
-        [ArrayList]$DestinationObjects = Get-AllObjectsFromSetup
+    } else {
+        [System.Collections.ArrayList]$SourceObjects = Get-AllObjectsFromCsvs
+        [System.Collections.ArrayList]$DestinationObjects = Get-AllObjectsFromSetup
         $deltaObjects = Compare-Objects -ObjsSource $SourceObjects -ObjsDestination $DestinationObjects
         Write-ToXmlFile -DifferenceObjects $deltaObjects ## to do
         $delta = "ConfigurationDelta.xml" ## to do
@@ -124,10 +123,10 @@ Function Get-SchemaConfig {
         [Bool]
         $Source = $False
     )
-    $attrs = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    $attrs = Get-ObjectsFromConfig -ObjectType "AttributeTypeDescription"
     $objs = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     $bindings = Get-ObjectsFromConfig -ObjectType BindingDescription
-    $schema = [ArrayList] @()
+    $schema = [System.Collections.ArrayList] @()
     $schema.AddRange($attrs)
     $schema.AddRange($objs)
     $schema.AddRange($bindings)
@@ -144,6 +143,14 @@ Function Get-PolicyConfig {
         $Source = $False
     )
     $mgmntPolicies = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
+    $sets = Get-ObjectsFromConfig -ObjectType Set
+    $workflowDef = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
+    $emailtmplt = Get-ObjectsFromConfig -ObjectType EmailTemplate
+    $filterscope = Get-ObjectsFromConfig -ObjectType FilterScope
+    $activityInfo = Get-ObjectsFromConfig -ObjectType ActivityInformationConfiguration
+    $funct = Get-ObjectsFromConfig -ObjectType Function
+    $syncRule = Get-ObjectsFromConfig -ObjectType SynchronizationRule
+    $syncFilter = Get-ObjectsFromConfig -ObjectType SynchronizationFilter
     if ($Source) {
         Write-ToCsv -Objects $mgmntPolicies -CsvName Policies
     }
@@ -151,7 +158,6 @@ Function Get-PolicyConfig {
 }
 
 Function Get-PortalConfig {
-    # NOG NA TE VRAGEN WAT INHOUD IS
     param(
         [Parameter(Mandatory=$False)]
         [Bool]
@@ -163,14 +169,18 @@ Function Get-PortalConfig {
     $objVisual = Get-ObjectsFromConfig -ObjectType ObjectVisualizationConfiguration
     $homePage = Get-ObjectsFromConfig -ObjectType HomepageConfiguration
 
-    $portalConfig = [ArrayList] @()
+    $portalConfig = [System.Collections.ArrayList] @()
     $portalConfig.Add($portalUI)
     $portalConfig.Add($navBar)
     $portalConfig.Add($searchScope)
     $portalConfig.Add($objVisual)
     $portalConfig.Add($homePage)
     if ($Source) {
-        Write-ToCsv -Objects $portalConfig -CsvName Portal
+        Write-ToCsv -Objects $portalUI -CsvName PortalUI
+        Write-ToCsv -Objects $navBar -CsvName NavBar 
+        Write-ToCsv -Objects $searchScope -CsvName SearchScope 
+        Write-ToCsv -Objects $objVisual -CsvName ObjectVisual 
+        Write-ToCsv -Objects $homePage -CsvName HomePage
     } 
     return $portalConfig
 }
@@ -181,7 +191,7 @@ function Get-ObjectsFromConfig {
         [String]
         $ObjectType
     )
-    $objects = Search-Resources -XPath "\$ObjectType" -ExpectedObjectType $ObjectType
+    $objects = Search-Resources -XPath "/$ObjectType" -ExpectedObjectType $ObjectType
     return $objects
 }
 
@@ -218,7 +228,7 @@ Function Compare-Objects {
         [array]
         $ObjsDestination
     )
-    $global:Difference = [ArrayList]@()
+    $global:Difference = [System.Collections.ArrayList]@()
     foreach ($obj in $ObjsSource) {   # source array object
             $objsDestMembers = Get-Member -InputObject $ObjsDestination # Target array objects
         if ($objsDestMembers -contains $obj) { # if object of source is in array of objects of target
@@ -260,7 +270,7 @@ Function Write-ToXmlFile {
         $xmlElement = $XmlDoc.CreateElement("ResourceOperation")
         $XmlOperation = $node.AppendChild($xmlElement)
         $XmlOperation.SetAttribute("operation", "Add Update")
-        $XmlOperation.SetAttribute("resourceType", $ObjectType)
+        $XmlOperation.SetAttribute("resourceType", $Obj.ObjectType)
         # Anchor description
         $xmlElement = $XmlDoc.CreateElement("AnchorAttributes")
         $XmlAnchors = $XmlOperation.AppendChild($xmlElement)
@@ -274,7 +284,7 @@ Function Write-ToXmlFile {
             $XmlAnchors.AppendChild($xmlElement2)
         } else{
         $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
-        $xmlElement.Set_InnerText($AnchorName)
+        $xmlElement.Set_InnerText("Name")
         $XmlAnchors.AppendChild($xmlElement)
         }
         # Attributes of the object
