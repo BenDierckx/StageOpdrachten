@@ -36,13 +36,10 @@ Function Start-Migration {
         Get-PolicyConfig -Source $true
     }
     else {
-        $SourceObjects = Get-AllObjectsFromCsvs
-        $DestinationObjects = @()
-        $DestinationObjects += Get-SchemaConfig
-        $DestinationObjects += Get-PortalConfig
-        $DestinationObjects += Get-PolicyConfig
+        [ArrayList]$SourceObjects = Get-AllObjectsFromCsvs
+        [ArrayList]$DestinationObjects = Get-AllObjectsFromSetup
         $deltaObjects = Compare-Objects -ObjsSource $SourceObjects -ObjsDestination $DestinationObjects
-        Write-ToXml -DifferenceObjects $deltaObjects ## to do
+        Write-ToXmlFile -DifferenceObjects $deltaObjects ## to do
         $delta = "ConfigurationDelta.xml" ## to do
         Import-Delta -DeltaConfigFilePath $delta 
     }
@@ -58,13 +55,28 @@ Function Start-Migration {
     # Import-Delta -DeltaConfigFilePath $createdxml.xml     V
 }
 
+Function Get-AllObjectsFromSetup {
+    $DestinationObjects = [System.Collections.ArrayList]@()
+    $schema = Get-SchemaConfig
+    $DestinationObjects.AddRange($schema)
+    $policy = Get-PolicyConfig
+    $DestinationObjects.AddRange($policy)
+    $portal = Get-PortalConfig
+    $DestinationObjects.AddRange($portal)
+    return $DestinationObjects
+}
+
 Function Get-AllObjectsFromCsvs {
-    $global:SourceObjects = @()
+    [System.Collections.ArrayList] $global:SourceObjects = @()
         if (Test-Path -Path "CsvConfigAttributes.csv" -and Test-Path -Path "CsvConfigBindings.csv" -and Test-Path "CsvConfigObjectTypes.csv") {
-            $SourceSchemaObjects = Get-ObjectsFromCsv -CsvFilePath "CsvConfigAttributes.csv"
-            $SourceSchemaObjects += Get-ObjectsFromCsv -CsvFilePath "CsvConfigObjectTypes.csv"
-            $SourceSchemaObjects += Get-ObjectsFromCsv -CsvFilePath "CsvConfigBindings.csv"
-            $global:SourceObjects += $SourceSchemaObjects
+            [System.Collections.ArrayList] $SourceSchemaObjects = @()
+            $Attrs = Get-ObjectsFromCsv -CsvFilePath "CsvConfigAttributes.csv"
+            $SourceSchemaObjects.AddRange($Attrs)
+            $Objs = Get-ObjectsFromCsv -CsvFilePath "CsvConfigObjectTypes.csv"
+            $SourceSchemaObjects.AddRange($Objs)
+            $Bindings = Get-ObjectsFromCsv -CsvFilePath "CsvConfigBindings.csv"
+            $SourceSchemaObjects.AddRange($Bindings)
+            $global:SourceObjects.AddRange($SourceSchemaObjects)
         } else {
             Write-Host "No correct csv files found for Schema configuration"
             $answer = ""
@@ -78,7 +90,7 @@ Function Get-AllObjectsFromCsvs {
 
         if (Test-Path -Path "CsvConfigPolicies.csv") {
           $SourcePolicyObjects = Get-ObjectsFromCsv -CsvFilePath "CsvConfigPolicies.csv"  
-          $global:SourceObjects += $SourcePolicyObjects
+          $global:SourceObjects.AddRange($SourcePolicyObjects)
         } else {
             Write-Host "No correct csv file found for Policy management configuration"
             $answer = ""
@@ -92,7 +104,7 @@ Function Get-AllObjectsFromCsvs {
 
         if (Test-Path -Path "CsvConfigPortals.csv") {
             $SourcePortalObjects = Get-ObjectsFromCsv -CsvFilePath "CsvConfigPolicies.csv"
-            $global:SourceObjects += $SourcePortalObjects    
+            $global:SourceObjects.AddRange($SourcePortalObjects)    
         } else {
             Write-Host "No correct csv file found for Portal configuration"
             $answer = ""
@@ -115,16 +127,14 @@ Function Get-SchemaConfig {
     $attrs = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
     $objs = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     $bindings = Get-ObjectsFromConfig -ObjectType BindingDescription
+    $schema = [ArrayList] @()
+    $schema.AddRange($attrs)
+    $schema.AddRange($objs)
+    $schema.AddRange($bindings)
     if ($Source) {
-        Write-ToCsv -Objects $attrs -CsvName Attributes
-        Write-ToCsv -Objects $objs -CsvName ObjectTypes
-        Write-ToCsv -Objects $bindings -CsvName Bindings
-    } else {
-    $schema = $attrs
-    $schema += $objs
-    $schema += $bindings
-    return $schema
+        Write-ToCsv -Objects $schema -CsvName Schema
     }
+    return $schema
 }
 
 Function Get-PolicyConfig {
@@ -147,12 +157,22 @@ Function Get-PortalConfig {
         [Bool]
         $Source = $False
     )
-  # Check on objectTypes
-  # $? = Search-Resources -Xpath "/?" -ExpectedObjectType ?
-  #$portals = Get-ObjectsFromConfig -ObjectType "PortalDescription"
-  if ($Source) {
-  #    Write-ToCsv -Objects $portals -CsvName Portal
-  }
+    $portalUI = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
+    $navBar = Get-ObjectsFromConfig -ObjectType NavigationBarConfiguration
+    $searchScope = Get-ObjectsFromConfig -ObjectType SearchScopeConfiguration
+    $objVisual = Get-ObjectsFromConfig -ObjectType ObjectVisualizationConfiguration
+    $homePage = Get-ObjectsFromConfig -ObjectType HomepageConfiguration
+
+    $portalConfig = [ArrayList] @()
+    $portalConfig.Add($portalUI)
+    $portalConfig.Add($navBar)
+    $portalConfig.Add($searchScope)
+    $portalConfig.Add($objVisual)
+    $portalConfig.Add($homePage)
+    if ($Source) {
+        Write-ToCsv -Objects $portalConfig -CsvName Portal
+    } 
+    return $portalConfig
 }
 
 function Get-ObjectsFromConfig {
@@ -175,8 +195,7 @@ Function Write-ToCsv {
         [String]
         $CsvName
     )
-    
-    $Objects | Export-Csv -Path "CsvConfig$CsvName.csv" -NoTypeInformation -Confirm
+    $Objects | Export-Csv -Path "CsvConfig$CsvName.csv" -NoTypeInformation
 }
 
 Function Get-ObjectsFromCsv {
@@ -199,26 +218,25 @@ Function Compare-Objects {
         [array]
         $ObjsDestination
     )
-    $global:Difference = @()
-    foreach ($Array in $ObjsSource) {
-        foreach ($obj in $Array){
-            $objsDestMembers = Get-Member -InputObject $ObjsDestination
-        if ($objsDestMembers -contains $obj) {
-            $TargetObject = $objsDestMembers | Where-Object $objsDestMembers -eq $obj
-            $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
-            $TargetMembers = $TargetObject | Where-Object membertype -like 'NoteProperty'
-            foreach ($member in $objMembers) {
-                foreach ($targetMember in $TargetMembers) {
+    $global:Difference = [ArrayList]@()
+    foreach ($obj in $ObjsSource) {   # source array object
+            $objsDestMembers = Get-Member -InputObject $ObjsDestination # Target array objects
+        if ($objsDestMembers -contains $obj) { # if object of source is in array of objects of target
+            $TargetObject = $objsDestination | Where-Object $objsDestMembers -eq $obj   # target array object
+            $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty' # source array object members
+            $TargetMembers = $TargetObject | Where-Object membertype -like 'NoteProperty' # target array object members
+            foreach ($member in $objMembers) { # source array object member
+                foreach ($targetMember in $TargetMembers) { # target array object member
                     if ($member.Name -eq $targetMember.Name) {
                         if ($member.Value -ne $TargetMember.Value) {
-                            $global:Difference += $obj
+                            $global:Difference.AddRange($obj)
+                            break
                         }
                     }
                 }
             }
-        }
-    } else {
-            $global:Difference += $obj
+        } else {
+            $global:Difference.AddRange($obj)
         }
     }
     return $Difference
@@ -237,64 +255,62 @@ Function Write-ToXmlFile {
 
     # Place objects in XML file
     # Iterate over the array of arrays of PsCustomObjects
-    foreach($Array in $DifferenceObjects) {
-        foreach ($obj in $Array) {
-            # Operation description
-            $xmlElement = $XmlDoc.CreateElement("ResourceOperation")
-            $XmlOperation = $node.AppendChild($xmlElement)
-            $XmlOperation.SetAttribute("operation", "Add Update")
-            $XmlOperation.SetAttribute("resourceType", $ObjectType)
-            # Anchor description
-            $xmlElement = $XmlDoc.CreateElement("AnchorAttributes")
-            $XmlAnchors = $XmlOperation.AppendChild($xmlElement)
-                # Different anchors for Bindings (referentials)
-            if ($obj.ObjectType -eq "BindingDescription") {
-                $xmlElement1 = $XmlDoc.CreateElement("AnchorAttribute")
-                $xmlElement1.Set_InnerText("BoundAttributeType")
-                $xmlElement2 = $XmlDoc.CreateElement("AnchorAttribute")
-                $xmlElement2.Set_InnerText("BoundObjectType")
-                $XmlAnchors.AppendChild($xmlElement1)
-                $XmlAnchors.AppendChild($xmlElement2)
-            } else{
-            $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
-            $xmlElement.Set_InnerText($AnchorName)
-            $XmlAnchors.AppendChild($xmlElement)
+    foreach ($obj in $DifferenceObjects) {
+        # Operation description
+        $xmlElement = $XmlDoc.CreateElement("ResourceOperation")
+        $XmlOperation = $node.AppendChild($xmlElement)
+        $XmlOperation.SetAttribute("operation", "Add Update")
+        $XmlOperation.SetAttribute("resourceType", $ObjectType)
+        # Anchor description
+        $xmlElement = $XmlDoc.CreateElement("AnchorAttributes")
+        $XmlAnchors = $XmlOperation.AppendChild($xmlElement)
+            # Different anchors for Bindings (referentials)
+        if ($obj.ObjectType -eq "BindingDescription") {
+            $xmlElement1 = $XmlDoc.CreateElement("AnchorAttribute")
+            $xmlElement1.Set_InnerText("BoundAttributeType")
+            $xmlElement2 = $XmlDoc.CreateElement("AnchorAttribute")
+            $xmlElement2.Set_InnerText("BoundObjectType")
+            $XmlAnchors.AppendChild($xmlElement1)
+            $XmlAnchors.AppendChild($xmlElement2)
+        } else{
+        $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
+        $xmlElement.Set_InnerText($AnchorName)
+        $XmlAnchors.AppendChild($xmlElement)
+        }
+        # Attributes of the object
+        $xmlEle = $XmlDoc.CreateElement("AttributeOperations")
+        $XmlAttributes = $XmlOperation.AppendChild($xmlEle)
+        # Get the PsCustomObject members from the MIM service without the hidden/extra members
+        $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
+        # iterate over the PsCustomObject members and append them to the AttributeOperations element
+        foreach ($member in $objMembers) {
+            if ($member.Name -eq "usageKeyword") {
+                foreach ($m in $member.Value) {
+                    $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
+                    $xmlVarElement.Set_InnerText($m)
+                    $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                    $xmlVariable.SetAttribute("operation", "add") # add because we don't want to replace the items 
+                    $xmlVariable.SetAttribute("name", $member.Name)
+                }
             }
-            # Attributes of the object
-            $xmlEle = $XmlDoc.CreateElement("AttributeOperations")
-            $XmlAttributes = $XmlOperation.AppendChild($xmlEle)
-            # Get the PsCustomObject members from the MIM service without the hidden/extra members
-            $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
-            # iterate over the PsCustomObject members and append them to the AttributeOperations element
-            foreach ($member in $objMembers) {
-                if ($member.Name -eq "usageKeyword") {
-                    foreach ($m in $member.Value) {
-                        $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
-                        $xmlVarElement.Set_InnerText($m)
-                        $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                        $xmlVariable.SetAttribute("operation", "add") # add because we don't want to replace the items 
-                        $xmlVariable.SetAttribute("name", $member.Name)
-                    }
-                }
-                # Attributes that are read only do not get implemented in the xml file
-                $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
-                 "ExpectedRulesList", "ResourceTime")
-                # Skip read only attributes and ObjectType (already used in ResourceOperation)
-                if ($illegalMembers -contains $member.Name) { continue }
-                # referencing purposes, no need in the attributes itself (Lithnet does this)
-                if ($member.Name -eq "ObjectID") {
-                    # set the objectID of the object as the id of the xml node
-                    $XmlOperation.SetAttribute("id", $member.Value)
-                    continue # Import-RmConfig creates an objectID in the new setup
-                }
-                $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
-                $xmlVarElement.Set_InnerText($member.Value)
-                $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                $xmlVariable.SetAttribute("operation", "replace") #Add of replace?
-                $xmlVariable.SetAttribute("name", $member.Name)
-                if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
-                    $xmlVariable.SetAttribute("type", "xmlref")
-                }
+            # Attributes that are read only do not get implemented in the xml file
+            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+             "ExpectedRulesList", "ResourceTime")
+            # Skip read only attributes and ObjectType (already used in ResourceOperation)
+            if ($illegalMembers -contains $member.Name) { continue }
+            # referencing purposes, no need in the attributes itself (Lithnet does this)
+            if ($member.Name -eq "ObjectID") {
+                # set the objectID of the object as the id of the xml node
+                $XmlOperation.SetAttribute("id", $member.Value)
+                continue # Import-RmConfig creates an objectID in the new setup
+            }
+            $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
+            $xmlVarElement.Set_InnerText($member.Value)
+            $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+            $xmlVariable.SetAttribute("operation", "replace") #Add of replace?
+            $xmlVariable.SetAttribute("name", $member.Name)
+            if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
+                $xmlVariable.SetAttribute("type", "xmlref")
             }
         }
     }
