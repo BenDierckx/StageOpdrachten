@@ -29,17 +29,17 @@ Function Get-SchemaConfigToJson {
         $Source = $False
     )
 
-    $attrs = Get-ObjectsFromConfigg -ObjectType AttributeTypeDescription
-    $objs = Get-ObjectsFromConfigg -ObjectType ObjectTypeDescription
-    $binds = Get-ObjectsFromConfigg -ObjectType BindingDescription
-    $constSpec = Get-ObjectsFromConfigg -ObjectType ConstantSpecifier
-    $schemaSup = Get-ObjectsFromConfigg -ObjectType SchemaSupportedLocales
+    $attrs = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    $objs = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
+    $binds = Get-ObjectsFromConfig -ObjectType BindingDescription
+    $constSpec = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
+    $schemaSup = Get-ObjectsFromConfig -ObjectType SchemaSupportedLocales
 
-    ConvertTo-Json -Objects $attrs -JsonName Attributes
-    ConvertTo-Json -Objects $objs -JsonName objects
-    ConvertTo-Json -Objects $binds -JsonName Bindings
-    ConvertTo-Json -Objects $constSpec -JsonName ConstantSpecifiers
-    ConvertTo-Json -Objects $schemaSup -JsonName SchemaSupportedLocales
+    Convert-ToJson -Objects $attrs -JsonName Attributes
+    Convert-ToJson -Objects $objs -JsonName objects
+    Convert-ToJson -Objects $binds -JsonName Bindings
+    Convert-ToJson -Objects $constSpec -JsonName ConstantSpecifiers
+    Convert-ToJson -Objects $schemaSup -JsonName SchemaSupportedLocales
 }
 
 Function Compare-Schema {
@@ -74,25 +74,25 @@ Function Get-PolicyConfigToJson {
         $Source = $False
     )
 
-    $manPol = Get-ObjectsFromConfigg -ObjectType ManagementPolicyRule
-    $sets = Get-ObjectsFromConfigg -ObjectType Set
-    $workFlowDef = Get-ObjectsFromConfigg -ObjectType WorkflowDefinition
-    $emailTem = Get-ObjectsFromConfigg -ObjectType EmailTemplate
-    $filterScope = Get-ObjectsFromConfigg -ObjectType FilterScope
-    $actInfConf = Get-ObjectsFromConfigg -ObjectType ActivityInformationConfiguration
-    $function = Get-ObjectsFromConfigg -ObjectType Function
-    $syncRule = Get-ObjectsFromConfigg -ObjectType SynchronizationRule
-    $syncFilter = Get-ObjectsFromConfigg -ObjectType SynchronizationFilter
+    $manPol = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
+    $sets = Get-ObjectsFromConfig -ObjectType Set
+    $workFlowDef = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
+    $emailTem = Get-ObjectsFromConfig -ObjectType EmailTemplate
+    $filterScope = Get-ObjectsFromConfig -ObjectType FilterScope
+    $actInfConf = Get-ObjectsFromConfig -ObjectType ActivityInformationConfiguration
+    $function = Get-ObjectsFromConfig -ObjectType Function
+    $syncRule = Get-ObjectsFromConfig -ObjectType SynchronizationRule
+    $syncFilter = Get-ObjectsFromConfig -ObjectType SynchronizationFilter
 
-    ConvertTo-Json -Objects $manPol -JsonName ManagementPolicyRules
-    ConvertTo-Json -Objects $sets -JsonName Sets
-    ConvertTo-Json -Objects $workFlowDef -JsonName WorkflowDefinitions
-    ConvertTo-Json -Objects $emailTem -JsonName EmailTemplates
-    ConvertTo-Json -Objects $filterScope -JsonName FilterScopes
-    ConvertTo-Json -Objects $actInfConf -JsonName ActivityInformationConfigurations
-    ConvertTo-Json -Objects $function -JsonName Functions
-    ConvertTo-Json -Objects $syncRule -JsonName SynchronizationRules
-    ConvertTo-Json -Objects $syncFilter -JsonName SynchronizationFilter
+    Convert-ToJson -Objects $manPol -JsonName ManagementPolicyRules
+    Convert-ToJson -Objects $sets -JsonName Sets
+    Convert-ToJson -Objects $workFlowDef -JsonName WorkflowDefinitions
+    Convert-ToJson -Objects $emailTem -JsonName EmailTemplates
+    Convert-ToJson -Objects $filterScope -JsonName FilterScopes
+    Convert-ToJson -Objects $actInfConf -JsonName ActivityInformationConfigurations
+    Convert-ToJson -Objects $function -JsonName Functions
+    Convert-ToJson -Objects $syncRule -JsonName SynchronizationRules
+    Convert-ToJson -Objects $syncFilter -JsonName SynchronizationFilter
 }
 
 Function Get-PortalConfigToJson {
@@ -102,19 +102,19 @@ Function Get-PortalConfigToJson {
         $Source = $False
     )
 
-    $homeConf = Get-ObjectsFromConfigg -ObjectType HomepageConfiguration
-    $portalUIConf = Get-ObjectsFromConfigg -ObjectType PortalUIConfiguration
-    $conf = Get-ObjectsFromConfigg -ObjectType Configuration
-    $naviBarConf = Get-ObjectsFromConfigg -ObjectType NavigationBarConfiguration
-    $searchScopeConf = Get-ObjectsFromConfigg -ObjectType SearchScopeConfiguration
-    $objectVisualConf = Get-ObjectsFromConfigg -ObjectType ObjectVisualizationConfiguration
+    $homeConf = Get-ObjectsFromConfig -ObjectType HomepageConfiguration
+    $portalUIConf = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
+    $conf = Get-ObjectsFromConfig -ObjectType Configuration
+    $naviBarConf = Get-ObjectsFromConfig -ObjectType NavigationBarConfiguration
+    $searchScopeConf = Get-ObjectsFromConfig -ObjectType SearchScopeConfiguration
+    $objectVisualConf = Get-ObjectsFromConfig -ObjectType ObjectVisualizationConfiguration
 
-    ConvertTo-Json -Objects $homeConf -JsonName HomepageConfigurations
-    ConvertTo-Json -Objects $portalUIConf -JsonName PortalUIConfigurations
-    ConvertTo-Json -Objects $conf -JsonName Configurations
-    ConvertTo-Json -Objects $naviBarConf -JsonName NavigationBarConfigurations
-    ConvertTo-Json -Objects $searchScopeConf -JsonName SearchScopeConfigurations
-    ConvertTo-Json -Objects $objectVisualConf -JsonName ObjectVisualizationConfigurations
+    Convert-ToJson -Objects $homeConf -JsonName HomepageConfigurations
+    Convert-ToJson -Objects $portalUIConf -JsonName PortalUIConfigurations
+    Convert-ToJson -Objects $conf -JsonName Configurations
+    Convert-ToJson -Objects $naviBarConf -JsonName NavigationBarConfigurations
+    Convert-ToJson -Objects $searchScopeConf -JsonName SearchScopeConfigurations
+    Convert-ToJson -Objects $objectVisualConf -JsonName ObjectVisualizationConfigurations
 }
 
 Function Get-ObjectsFromConfig {
@@ -143,7 +143,7 @@ Function Convert-ToJson {
         $objMembers = $obj.psobject.members | Where-Object membertype -Like 'noteproperty'
         $obj = $objMembers
     }
-    $Objects | ConvertTo-Json | Out-File "./Json$JsonName.json"      # "./IS4U.MigrateTest"
+    ConvertTo-Json -InputObject $Objects -Depth 4 -Compress | Out-File "./Json$JsonName.json"      # "./IS4U.MigrateTest"
 }
 
 Function Get-ObjectsFromJson {
