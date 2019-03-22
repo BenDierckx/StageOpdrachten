@@ -42,6 +42,31 @@ Function Get-SchemaConfigToJson {
     ConvertTo-Json -Objects $schemaSup -JsonName SchemaSupportedLocales
 }
 
+Function Compare-Schema {
+    Write-Host "Starting compare of Schema configuration..."
+    # Source of objects to be imported
+    $attrsSource = Get-ObjectsFromJson -JsonFilePath "ConfigAttributes.json"
+    $objsSource = Get-ObjectsFromJson -JsonFilePath "ConfigObjectTypes.json"
+    $bindingsSource = Get-ObjectsFromJson -JsonFilePath "ConfigBindings.json"
+    $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstSpecifiers.json"
+    $schemaSupsSource = Get-ObjectsFromJson -JsonFilePath "SchemaSupportedLocales.json"
+    
+    # Target Setup objects, comparing purposes
+    $attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
+    $objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
+    $bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
+    $constSpecsDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
+    $schemaSupsDest = Search-Resources -XPath "/SchemaSupportedLocales" -ExpectedObjectType SchemaSupportedLocales
+
+    # Comparing of the Source and Target Setup to create delta xml file
+    Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest
+    Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest
+    Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest
+    Compare-Objects -ObjsSource $constSpecsSource -ObjsDestination $constSpecsDest
+    Compare-Objects -ObjsSource $schemaSupsSource -ObjsDestination $schemaSupsDest
+    Write-Host "Compare of Schema configuration completed."
+}
+
 Function Get-PolicyConfigToJson {
     param(
         [Parameter(Mandatory=$False)]
