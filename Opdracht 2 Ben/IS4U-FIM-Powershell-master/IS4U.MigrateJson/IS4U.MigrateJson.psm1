@@ -33,13 +33,13 @@ Function Get-SchemaConfigToJson {
     $objs = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     $binds = Get-ObjectsFromConfig -ObjectType BindingDescription
     $constSpec = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
-    $schemaSup = Get-ObjectsFromConfig -ObjectType SchemaSupportedLocales
+    #$schemaSup = Get-ObjectsFromConfig -ObjectType SchemaSupportedLocales
 
     Convert-ToJson -Objects $attrs -JsonName Attributes
     Convert-ToJson -Objects $objs -JsonName objects
     Convert-ToJson -Objects $binds -JsonName Bindings
     Convert-ToJson -Objects $constSpec -JsonName ConstantSpecifiers
-    Convert-ToJson -Objects $schemaSup -JsonName SchemaSupportedLocales
+    #Convert-ToJson -Objects $schemaSup -JsonName SchemaSupportedLocales
 }
 
 Function Compare-Schema {
@@ -49,21 +49,21 @@ Function Compare-Schema {
     $objsSource = Get-ObjectsFromJson -JsonFilePath "ConfigObjectTypes.json"
     $bindingsSource = Get-ObjectsFromJson -JsonFilePath "ConfigBindings.json"
     $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstSpecifiers.json"
-    $schemaSupsSource = Get-ObjectsFromJson -JsonFilePath "SchemaSupportedLocales.json"
+    #$schemaSupsSource = Get-ObjectsFromJson -JsonFilePath "SchemaSupportedLocales.json"
     
     # Target Setup objects, comparing purposes
     $attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
     $objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
     $bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
     $constSpecsDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
-    $schemaSupsDest = Search-Resources -XPath "/SchemaSupportedLocales" -ExpectedObjectType SchemaSupportedLocales
+    #$schemaSupsDest = Search-Resources -XPath "/SchemaSupportedLocales" -ExpectedObjectType SchemaSupportedLocales
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest
     Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest
     Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest
     Compare-Objects -ObjsSource $constSpecsSource -ObjsDestination $constSpecsDest
-    Compare-Objects -ObjsSource $schemaSupsSource -ObjsDestination $schemaSupsDest
+    #Compare-Objects -ObjsSource $schemaSupsSource -ObjsDestination $schemaSupsDest
     Write-Host "Compare of Schema configuration completed."
 }
 
@@ -91,7 +91,9 @@ Function Get-PolicyConfigToJson {
     Convert-ToJson -Objects $filterScope -JsonName FilterScopes
     Convert-ToJson -Objects $actInfConf -JsonName ActivityInformationConfigurations
     Convert-ToJson -Objects $function -JsonName Functions
-    Convert-ToJson -Objects $syncRule -JsonName SynchronizationRules
+    if($syncRule){
+        Convert-ToJson -Objects $syncRule -JsonName SynchronizationRules
+    }
     Convert-ToJson -Objects $syncFilter -JsonName SynchronizationFilter
 }
 
@@ -111,7 +113,9 @@ Function Get-PortalConfigToJson {
 
     Convert-ToJson -Objects $homeConf -JsonName HomepageConfigurations
     Convert-ToJson -Objects $portalUIConf -JsonName PortalUIConfigurations
-    Convert-ToJson -Objects $conf -JsonName Configurations
+    if($conf){
+        Convert-ToJson -Objects $conf -JsonName Configurations
+    }
     Convert-ToJson -Objects $naviBarConf -JsonName NavigationBarConfigurations
     Convert-ToJson -Objects $searchScopeConf -JsonName SearchScopeConfigurations
     Convert-ToJson -Objects $objectVisualConf -JsonName ObjectVisualizationConfigurations
