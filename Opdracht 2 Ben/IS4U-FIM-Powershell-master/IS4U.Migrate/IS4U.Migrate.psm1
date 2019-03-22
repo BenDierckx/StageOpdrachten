@@ -28,120 +28,148 @@ Function Start-Migration {
         # Source?
         [Parameter(Mandatory=$False)]
         [Bool]
-        $SourceOfMIMSetup = $False
+        $SourceOfMIMSetup = $False,
+        
+        [Parameter(Mandatory=$False)]
+        [Bool]
+        $ImportAllConfigurations = $true,
+        
+        [Parameter(Mandatory=$False)]
+        [Bool]
+        $ImportSchema=$False,
+        
+        [Parameter(Mandatory=$FAlse)]
+        [Bool]
+        $ImportPolicy = $False,
+        
+        [Parameter(Mandatory=$False)]
+        [Bool]
+        $ImportPortal = $False
     )
     if ($SourceOfMIMSetup) {
-        Get-SchemaConfig -Source $true
-        Get-PortalConfig -Source $true
-        Get-PolicyConfig -Source $true
+        Get-SchemaConfigToXml
+        Get-PortalConfigToXml
+        Get-PolicyConfigToXml
     } else {
-        [System.Collections.ArrayList]$SourceObjects = Get-AllObjectsFromCsvs
-        [System.Collections.ArrayList]$DestinationObjects = Get-AllObjectsFromSetup
-        $deltaObjects = Compare-Objects -ObjsSource $SourceObjects -ObjsDestination $DestinationObjects
-        Write-ToXmlFile -DifferenceObjects $deltaObjects ## to do
-        $delta = "ConfigurationDelta.xml" ## to do
-        Import-Delta -DeltaConfigFilePath $delta 
+        if ($ImportSchema -or $ImportPolicy -or $ImportPortal) {
+            $ImportAllConfigurations = $False
+        }
+        if ($ImportAllConfigurations) {
+            Compare-Schema
+            Compare-Portal
+            Compare-Policy
+        } else {
+            if ($ImportSchema) {
+                Compare-Schema
+            }
+            if ($ImportPolict) {
+                Compare-Policy
+            }
+            if ($ImportPortal) {
+                Compare-Portal
+            }
+        }
     }
-    #SOURCE
-    # Get the schema => Get-SchemaConfig -SourceSchema $True + Get-...Csv + Get-...csv     +-V
-    # bring csv's to destination server     V
-    #DESTINATION
-    # Use csvs that exist       V
-    # Get the schemas from the to be updated setup => Get-schemaConfig + Get-....   +- V
-    # Csv to array => Get-AllObjectsFromCsvs        V
-    # compare arrays => Compare-Objects -ObjsSource $DevObjArray -ObjsDestination $ProdObjArray     +-V
-    # Write differences to xml => Write-ToXml       +-V
-    # Import-Delta -DeltaConfigFilePath $createdxml.xml     V
+    Import-Delta -DeltaConfigFilePath "ConfigurationDelta.xml"
 }
 
-Function Get-AllObjectsFromSetup {
-    $DestinationObjects = [System.Collections.ArrayList]@()
-    $schema = Get-SchemaConfig
-    $DestinationObjects.AddRange($schema)
-    $policy = Get-PolicyConfig
-    $DestinationObjects.AddRange($policy)
-    $portal = Get-PortalConfig
-    $DestinationObjects.AddRange($portal)
-    return $DestinationObjects
+Function Compare-Schema {
+    Write-Host "Starting compare of Schema configuration..."
+    # Source of objects to be imported
+    $attrsSource = Get-ObjectsFromXml -XmlFilePath "ConfigAttributes.xml"
+    $objsSource = Get-ObjectsFromXml -XmlFilePath "ConfigObjectTypes.xml"
+    $bindingsSource = Get-ObjectsFromXml -XmlFilePath "ConfigBindings.xml"
+    $cstspecifiersSource = Get-ObjectsFromXml -XmlFilePath "ConfigConstSpecifiers.xml"
+    
+    # Target Setup objects, comparing purposes
+    $attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
+    $objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
+    $bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
+    $cstspecifiersDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
+
+    # Comparing of the Source and Target Setup to create delta xml file
+    Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest
+    Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest
+    Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest
+    Compare-Objects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest
+    Write-Host "Compare of Schema configuration completed."
 }
 
-Function Get-AllObjectsFromCsvs {
-    [System.Collections.ArrayList] $global:SourceObjects = @()
-        if (Test-Path -Path "CsvConfigAttributes.csv" -and Test-Path -Path "CsvConfigBindings.csv" -and Test-Path "CsvConfigObjectTypes.csv") {
-            [System.Collections.ArrayList] $SourceSchemaObjects = @()
-            $Attrs = Get-ObjectsFromCsv -CsvFilePath "CsvConfigAttributes.csv"
-            $SourceSchemaObjects.AddRange($Attrs)
-            $Objs = Get-ObjectsFromCsv -CsvFilePath "CsvConfigObjectTypes.csv"
-            $SourceSchemaObjects.AddRange($Objs)
-            $Bindings = Get-ObjectsFromCsv -CsvFilePath "CsvConfigBindings.csv"
-            $SourceSchemaObjects.AddRange($Bindings)
-            $global:SourceObjects.AddRange($SourceSchemaObjects)
-        } else {
-            Write-Host "No correct csv files found for Schema configuration"
-            $answer = ""
-            while ($answer -ne "y") {
-                $answer = Read-Host -Prompt "Continue?[y/n]"
-                if ($answer -eq "n") {
-                    break
-                }
-            }
-        }
+Function Compare-Policy {
+    Write-Host "Starting compare of Policy configuration..."
+    # Source of objects to be imported
+    $mgmntPlciesSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigPolicies.xml"
+    $setsSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSets.xml"
+    $workflowSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigWorkflows.xml"
+    $emailSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigEmailTemplates.xml"
+    $filtersSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigFilterScopes.xml"
+    $activitySrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigActivityInfo.xml"
+    $funcSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigPolicyFunctions.xml"
+    $syncRSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSyncRules.xml"
+    $syncFSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSyncFilters.xml"
 
-        if (Test-Path -Path "CsvConfigPolicies.csv") {
-          $SourcePolicyObjects = Get-ObjectsFromCsv -CsvFilePath "CsvConfigPolicies.csv"  
-          $global:SourceObjects.AddRange($SourcePolicyObjects)
-        } else {
-            Write-Host "No correct csv file found for Policy management configuration"
-            $answer = ""
-            while ($answer -ne "y") {
-                $answer = Read-Host -Prompt "Continue?[y/n]"
-                if ($answer -eq "n") {
-                    break
-                }
-            }
-        }
+    # Target Setup objects, comparing purposes
+    $mgmntPlciesDest = Search-Resources -XPath "/ManagementPolicyRule" -ExpectedObjectType ManagementPolicyRule
+    $setsDest = Search-Resources -XPath "/Set" -ExpectedObjectType Set
+    $workflowDest = Search-Resources -XPath "/WorkflowDefinition" -ExpectedObjectType WorkflowDefinition
+    $emailDest = Search-Resources -XPath "/EmailTemplate" -ExpectedObjectType EmailTemplate
+    $filtersDest = Search-Resources -XPath "/FilterScope" -ExpectedObjectType FilterScope
+    $activityDest = Search-Resources -XPath "/ActivityInformationConfiguration" -ExpectedObjectType ActivityInformationConfiguration
+    $funcDest = Search-Resources -XPath "/Function" -ExpectedObjectType Function 
+    $syncRDest = Search-Resources -XPath "/SynchronizationRule" -ExpectedObjectType SynchronizationRule
+    $syncFDest = Search-Resources -XPath "/SynchronizationFilter" -ExpectedObjectType SynchronizationFilter
 
-        if (Test-Path -Path "CsvConfigPortals.csv") {
-            $SourcePortalObjects = Get-ObjectsFromCsv -CsvFilePath "CsvConfigPolicies.csv"
-            $global:SourceObjects.AddRange($SourcePortalObjects)    
-        } else {
-            Write-Host "No correct csv file found for Portal configuration"
-            $answer = ""
-            while ($answer -ne "y") {
-                $answer = Read-Host -Prompt "Continue?[y/n]"
-                if ($answer -eq "n") {
-                    break
-                }
-            }
-        }
-    return $SourceObjects
+    # Comparing of the Source and Target Setup to create delta xml file
+    Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest
+    Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest
+    Compare-Objects -ObjsSource $workflowSrc -ObjsDestination $workflowDest
+    Compare-Objects -ObjsSource $emailSrc -ObjsDestination $emailDest 
+    Compare-Objects -ObjsSource $filtersSrc -ObjsDestination $filtersDest
+    Compare-Objects -ObjsSource $activitySrc -ObjsDestination $activityDest
+    Compare-Objects -ObjsSource $funcSrc -ObjsDestination $funcDest
+    Compare-Objects -ObjsSource $syncRSrc -ObjsDestination $syncRDest
+    Compare-Objects -ObjsSource $syncFSrc -ObjsDestination $syncFDest
+    Write-Host "Compare of Policy configuration completed."
 }
 
-Function Get-SchemaConfig {
-    param (
-        [Parameter(Mandatory=$False)]
-        [Bool]
-        $Source = $False
-    )
-    $attrs = Get-ObjectsFromConfig -ObjectType "AttributeTypeDescription"
+Function Compare-Portal {
+    Write-Host "Starting compare of Portal configuration..."
+    # Source of objects to be imported
+    $UISrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigPortalUI.xml"
+    $navSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigNavBar.xml"
+    $srchScopeSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSearchScope.xml"
+    $objVisSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigObjectVisual.xml"
+    $homePSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigHomePage.xml"
+
+    # Target Setup objects, comparing purposes
+    $UIDest = Search-Resources -XPath "/PortalUIConfiguration" -ExpectedObjectType PortalUIConfiguration
+    $navDest = Search-Resources -XPath "/NavigationBarConfiguration" -ExpectedObjectType NavigationBarConfiguration
+    $srchScopeDest = Search-Resources -XPath "/SearchScopeConfiguration" -ExpectedObjectType SearchScopeConfiguration
+    $objVisDest = Search-Resources -XPath "/ObjectVisualizationConfiguration" -ExpectedObjectType ObjectVisualizationConfiguration
+    $homePDest = Search-Resources -XPath "/HomepageConfiguration" -ExpectedObjectType HomepageConfiguration
+
+    # Comparing of the Source and Target Setup to create delta xml file
+    Compare-Objects -ObjsSource $UISrc -ObjsDestination $UIDest
+    Compare-Objects -ObjsSource $navSrc -ObjsDestination $navDest
+    Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest
+    Compare-Objects -ObjsSource $objVisSrc -ObjsDestination $objVisDest
+    Compare-Objects -ObjsSource $homePSrc -ObjsDestination $homePDest
+    Write-Host "Compare of Portal configuration completed."
+}
+
+Function Get-SchemaConfigToXml {
+    $attrs = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
     $objs = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     $bindings = Get-ObjectsFromConfig -ObjectType BindingDescription
-    $schema = [System.Collections.ArrayList] @()
-    $schema.AddRange($attrs)
-    $schema.AddRange($objs)
-    $schema.AddRange($bindings)
-    if ($Source) {
-        Write-ToCsv -Objects $schema -CsvName Schema
-    }
-    return $schema
+    $constantSpec = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
+
+    Write-ToCliXml -Objects $attrs -xmlName Attributes 
+    Write-ToCliXml -Objects $objs -xmlName ObjectTypes 
+    Write-ToCliXml -Objects $bindings -xmlName Bindings
+    Write-ToCliXml -Objects $constantSpec -xmlName ConstSpecifiers
 }
 
-Function Get-PolicyConfig {
-    param(
-        [Parameter(Mandatory=$False)]
-        [Bool]
-        $Source = $False
-    )
+Function Get-PolicyConfigToXml {
     $mgmntPolicies = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
     $sets = Get-ObjectsFromConfig -ObjectType Set
     $workflowDef = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
@@ -151,38 +179,30 @@ Function Get-PolicyConfig {
     $funct = Get-ObjectsFromConfig -ObjectType Function
     $syncRule = Get-ObjectsFromConfig -ObjectType SynchronizationRule
     $syncFilter = Get-ObjectsFromConfig -ObjectType SynchronizationFilter
-    if ($Source) {
-        Write-ToCsv -Objects $mgmntPolicies -CsvName Policies
-    }
-    return $mgmntPolicies
+
+    Write-ToCliXml -Objects $mgmntPolicies -xmlName Policies
+    Write-ToCliXml -Objects $sets -xmlName Sets 
+    Write-ToCliXml -Objects $workflowDef -xmlName Workflows 
+    Write-ToCliXml -Objects $emailtmplt -xmlName EmailTemplates 
+    Write-ToCliXml -Objects $filterscope -xmlName FilterScopes 
+    Write-ToCliXml -Objects $activityInfo -xmlName ActivityInfo 
+    Write-ToCliXml -Objects $funct -xmlName PolicyFunctions 
+    Write-ToCliXml -Objects $syncRule -xmlName SyncRules 
+    Write-ToCliXml -Objects $syncFilter -xmlName SyncFilters 
 }
 
-Function Get-PortalConfig {
-    param(
-        [Parameter(Mandatory=$False)]
-        [Bool]
-        $Source = $False
-    )
+Function Get-PortalConfigToXml {
     $portalUI = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
     $navBar = Get-ObjectsFromConfig -ObjectType NavigationBarConfiguration
     $searchScope = Get-ObjectsFromConfig -ObjectType SearchScopeConfiguration
     $objVisual = Get-ObjectsFromConfig -ObjectType ObjectVisualizationConfiguration
     $homePage = Get-ObjectsFromConfig -ObjectType HomepageConfiguration
 
-    $portalConfig = [System.Collections.ArrayList] @()
-    $portalConfig.Add($portalUI)
-    $portalConfig.Add($navBar)
-    $portalConfig.Add($searchScope)
-    $portalConfig.Add($objVisual)
-    $portalConfig.Add($homePage)
-    if ($Source) {
-        Write-ToCsv -Objects $portalUI -CsvName PortalUI
-        Write-ToCsv -Objects $navBar -CsvName NavBar 
-        Write-ToCsv -Objects $searchScope -CsvName SearchScope 
-        Write-ToCsv -Objects $objVisual -CsvName ObjectVisual 
-        Write-ToCsv -Objects $homePage -CsvName HomePage
-    } 
-    return $portalConfig
+    Write-ToCliXml -Objects $portalUI -xmlName PortalUI
+    Write-ToCliXml -Objects $navBar -xmlName NavBar 
+    Write-ToCliXml -Objects $searchScope -xmlName SearchScope 
+    Write-ToCliXml -Objects $objVisual -xmlName ObjectVisual 
+    Write-ToCliXml -Objects $homePage -xmlName HomePage
 }
 
 function Get-ObjectsFromConfig {
@@ -195,7 +215,8 @@ function Get-ObjectsFromConfig {
     return $objects
 }
 
-Function Write-ToCsv {
+# Csv problem: Arrays in the PsCustomObjects do not get the required depth
+Function Write-ToCliXml {
     param(
         [Parameter(Mandatory=$True)]
         [Array]
@@ -203,18 +224,23 @@ Function Write-ToCsv {
 
         [Parameter(Mandatory=$True)]
         [String]
-        $CsvName
+        $xmlName
     )
-    $Objects | Export-Csv -Path "CsvConfig$CsvName.csv" -NoTypeInformation
+    # remove PsCustomObjects properties we don't need
+    foreach ($obj in $Objects) {
+        $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
+        $obj = $objMembers
+    }
+    $Objects | Export-Clixml -Path "xml$xmlName.xml" -Depth 4
 }
 
-Function Get-ObjectsFromCsv {
+Function Get-ObjectsFromXml {
     param(
         [Parameter(Mandatory=$True)]
         [String]
-        $CsvFilePath
+        $xmlFilePath
     )
-    $objs = Import-Csv -Path $CsvFilePath
+    $objs = Import-Clixml -Path $xmlFilePath
     return $objs
 }
 
@@ -230,36 +256,50 @@ Function Compare-Objects {
     )
     $global:Difference = [System.Collections.ArrayList]@()
     foreach ($obj in $ObjsSource) {   # source array object
-            $objsDestMembers = Get-Member -InputObject $ObjsDestination # Target array objects
-        if ($objsDestMembers -contains $obj) { # if object of source is in array of objects of target
-            $TargetObject = $objsDestination | Where-Object $objsDestMembers -eq $obj   # target array object
+        if ($objsDestination -contains $obj) { # if object of source is in (array of) objects of target
+            $TargetObject = $objsDestination | Where-Object {$_ -eq $obj}   # target array object
             $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty' # source array object members
             $TargetMembers = $TargetObject | Where-Object membertype -like 'NoteProperty' # target array object members
             foreach ($member in $objMembers) { # source array object member
                 foreach ($targetMember in $TargetMembers) { # target array object member
                     if ($member.Name -eq $targetMember.Name) {
                         if ($member.Value -ne $TargetMember.Value) {
-                            $global:Difference.AddRange($obj)
+                            $global:Difference.Add($obj)
                             break
                         }
                     }
                 }
             }
         } else {
-            $global:Difference.AddRange($obj)
+            $global:Difference.Add($obj)
         }
     }
-    return $Difference
+    Write-ToXmlFile -DifferenceObjects $global:Difference
 }
 
 Function Write-ToXmlFile {
     param (
         [Parameter(Mandatory=$True)]
-        [Array]
+        [System.Collections.ArrayList]
         $DifferenceObjects
     )
     # Inititalization xml file
-    $FileName = "configurationTemplate.xml"
+    $FileName = "configurationDelta.xml"
+    # Create empty starting lithnet configuration xml file
+    if (!(Test-Path -Path $FileName)) {
+        [xml]$Doc = New-Object System.Xml.XmlDocument
+        $initalElement = $Doc.CreateElement("Lithnet.ResourceManagement.ConfigSync")
+        $operationsElement = $Doc.CreateElement("Operations")
+        $dec = $Doc.CreateXmlDeclaration("1.0","UTF-8",$null)
+        $Doc.AppendChild($dec)
+        $startNode = $Doc.AppendChild($initalElement)
+        $startNode.AppendChild($operationsElement)
+        $Doc.Save("./IS4U.Migrate/configurationDelta.xml")
+    }
+    if (!(Test-Path -Path $FileName)) {
+        Write-Host "File not found"
+        break
+    }
     $XmlDoc = [System.Xml.XmlDocument] (Get-Content $FileName)
     $node = $XmlDoc.SelectSingleNode('//Operations')
 
@@ -282,7 +322,7 @@ Function Write-ToXmlFile {
             $xmlElement2.Set_InnerText("BoundObjectType")
             $XmlAnchors.AppendChild($xmlElement1)
             $XmlAnchors.AppendChild($xmlElement2)
-        } else{
+        } else {
         $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
         $xmlElement.Set_InnerText("Name")
         $XmlAnchors.AppendChild($xmlElement)
@@ -294,7 +334,7 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
-            if ($member.Name -eq "usageKeyword") {
+            if ($member.Value.GetType().BaseType.Name -eq "Array") {  ## aangepast, beziet altijd of het array is of niet
                 foreach ($m in $member.Value) {
                     $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
                     $xmlVarElement.Set_InnerText($m)
@@ -324,10 +364,10 @@ Function Write-ToXmlFile {
             }
         }
     }
-    # Save the xml in a seperate xml file 
-    $XmlDoc.Save("ConfigurationDelta.xml")
+    # Save the xml 
+    $XmlDoc.Save("./IS4U.Migrate/ConfigurationDelta.xml")
     # Confirmation
-    Write-Host "Written differences in objects to a delta xml file"
+    Write-Host "Written differences in objects to the delta xml file(ConfiurationDelta.xml)"
     # Return the new xml 
     #[xml]$result = $XmlDoc | Select-Xml -XPath "//ResourceOperation[@resourceType='$ObjectType']"
     #[xml]$result = [System.Xml.XmlDocument] (Get-Content ".\$ObjectType.xml")
