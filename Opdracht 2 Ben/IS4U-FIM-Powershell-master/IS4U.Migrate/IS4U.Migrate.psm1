@@ -69,8 +69,8 @@ Function Start-Migration {
                 Compare-Portal
             }
         }
+        Import-Delta -DeltaConfigFilePath "ConfigurationDelta.xml"
     }
-    Import-Delta -DeltaConfigFilePath "ConfigurationDelta.xml"
 }
 
 Function Compare-Schema {
@@ -231,7 +231,7 @@ Function Write-ToCliXml {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         $obj = $objMembers
     }
-    $Objects | Export-Clixml -Path "xml$xmlName.xml" -Depth 4
+    $Objects | Export-Clixml -Path "Config$xmlName.xml" -Depth 4
 }
 
 Function Get-ObjectsFromXml {
@@ -254,27 +254,24 @@ Function Compare-Objects {
         [array]
         $ObjsDestination
     )
-    $global:Difference = [System.Collections.ArrayList]@()
-    foreach ($obj in $ObjsSource) {   # source array object
-        if ($objsDestination -contains $obj) { # if object of source is in (array of) objects of target
-            $TargetObject = $objsDestination | Where-Object {$_ -eq $obj}   # target array object
-            $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty' # source array object members
-            $TargetMembers = $TargetObject | Where-Object membertype -like 'NoteProperty' # target array object members
-            foreach ($member in $objMembers) { # source array object member
-                foreach ($targetMember in $TargetMembers) { # target array object member
-                    if ($member.Name -eq $targetMember.Name) {
-                        if ($member.Value -ne $TargetMember.Value) {
-                            $global:Difference.Add($obj)
-                            break
-                        }
-                    }
-                }
-            }
-        } else {
-            $global:Difference.Add($obj)
+    $difference = [System.Collections.ArrayList] @()
+    foreach ($obj in $ObjsSource){
+        $obj2 = $ObjsDestination | Where-Object {$_.Name -eq $obj.Name}
+        if (!$obj2) {
+            $difference.Add($obj)
         }
+        $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
+        $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference from original!
+        $compObj = $compObj | Where-Object membertype -like 'noteproperty'
+        $newObj = [PsCustomObject] @{}
+        foreach($prop in $compObj){
+            $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+           }
+        Write-host "Different object:"
+        Write-host $newObj   
+        $difference.Add($newObj)
     }
-    Write-ToXmlFile -DifferenceObjects $global:Difference
+    Write-ToXmlFile -DifferenceObjects $Difference
 }
 
 Function Write-ToXmlFile {

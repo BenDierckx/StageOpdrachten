@@ -2,44 +2,58 @@ Import-Module IS4U.Migrate
 
 # Set-ExecutionPolicy -Scope Process Unrestricted
 
-Describe "Write-ToCsv" {
-    Context "With parameter" {
-        $obj1 = [PSCustomObject]@{
-            Name = "Test1"
-            Value = "test1"
+Describe "Compare-Objects" {
+    $obj1 = @(
+        [PSCustomObject]@{
+            Name = "Value"
+            Test = "test"
+            ObjectType = "String"
+            arry = @("m", "mm")
+        },
+        [PSCustomObject]@{
+            Name = "Valu2"
+            Test = "tes2"
+            ObjectType = "int"
+            arry = @("rt", "sd")
         }
-        $obj2 = [PSCustomObject]@{
-            Name = "Test2"
-            Value = "test2"
+    )
+
+    $obj2 = @(
+        [PSCustomObject]@{
+            Name = "Value"
+            Test = "test"
+            ObjectType = "String"
+            arry = @("m", "mm")
+        },
+        [PSCustomObject]@{
+            Name = "Valu2"
+            Test = "testt"
+            ObjectType = "int"
+            arry = @("addam", "ldld")
         }
-        $obj3 = [PSCustomObject]@{
-            Name = "Test3"
-            Value = "test3"
+    )
+
+    Context "With parameters"{
+        $diff = @()
+        foreach ($member1 in $obj1){
+            $member2 = $obj2 | Where-Object {$_.Name -eq $member1.Name}
+            #if ($member2.psobject.properties.value -eq $member1.psobject.Properties.value) {
+                write-host $member1.psobject.Properties.Value
+                #write-host $member1prop.Value
+            #}
+       $test = Compare-Object -ReferenceObject $member1.psobject.members -DifferenceObject $member2.psobject.members -PassThru
+       $testt = $test | Where-Object {$_.SideIndicator -eq '<='} # als originele anders is!
+       $testt = $testt | Where-Object membertype -like 'noteproperty'
+       $diff += $testt
+       write-host "obj:"
+       write-host $diff
+       $newobj = [pscustomobject] @{}
+       foreach($prop in $diff){
+        $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+       }    
+       Write-Host $newobj
         }
-        $obj4 = [PSCustomObject]@{
-            Name = "Test4"
-            Value = "test4"
-        }
-        $objs = @($obj1, $obj2, $obj3, $obj4)
-        Write-Host $objs
-        Write-ToCsv -Objects $objs -CsvName "Testing"
-        $result = Get-ObjectsFromCsv -CsvFilePath "CsvConfigTesting.csv"
-        Write-Host $result
     }
 }
-
-<#  
-    - componenten maken, A component is a collection of resources such as sets,
-     MPRs and workflows that come together to perform a particular function:
-    * User Interface (RCDCs, Nav bar links, etc)
-    * Schema (attributes, bindings, resource types)
-    * Security model (permissions)
-    * (SSPR)
-    - ^ophalen gegevens uit fim
-    - exporteren in delen naar xml of ander bestand?
-    - 2 xml files genereren (origineel en met updates?)
-    - Delta vergelijkt de 2
-    - Delta met import-RmConfig (-preview om te zien wat er zou veranderen)
-#>
 
 # Set-ExecutionPolicy -Scope Process Unrestricted

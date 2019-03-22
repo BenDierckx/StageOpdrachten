@@ -5,7 +5,7 @@
 @{
 
     # Script module or binary module file associated with this manifest.
-    RootModule = 'IS4U.MigrateTest.psm1'
+    RootModule = 'IS4U.MigrateJson.psm1'
     
     # Version number of this module.
     ModuleVersion = '1.0'
@@ -75,7 +75,7 @@
     # NestedModules = @()
     
     # Functions to export from this module
-    FunctionsToExport = 'Start-Migration', 'Get-AllObjectsFromCsvs', 'Get-SchemaConfigg', 'Get-PolicyConfig', 'Get-PortalConfig', 'Get-ObjectsFromConfig', 'Write-ToCsv', 'Get-ObjectsFromCsv', 'Compare-XmlFiles', 'Write-ToXmlFile', 'Import-Delta'
+    FunctionsToExport = 'Start-Migration', 'Get-AllObjectsFromCsvs', 'Get-SchemaConfigToJson', 'Get-PolicyConfigToJson', 'Get-PortalConfigToJson', 'Get-ObjectsFromConfig', 'Convert-ToJson', 'Get-ObjectsFromJson', 'Compare-Objects', 'Convert-ToJsonFile', 'Import-Delta'
     
     # Cmdlets to export from this module
     CmdletsToExport = ''

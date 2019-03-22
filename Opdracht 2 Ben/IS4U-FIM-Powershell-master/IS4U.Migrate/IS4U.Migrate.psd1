@@ -14,7 +14,7 @@
     GUID = 'a18d347c-034a-4595-82bf-4b62be1b92f7'
     
     # Author of this module
-    Author = 'Wim Beck'
+    Author = 'Dieter Schelkens'
     
     # Company or vendor of this module
     CompanyName = 'IS4U'
@@ -128,5 +128,3 @@
     # DefaultCommandPrefix = ''
     
 }
-    
-    
