@@ -108,6 +108,7 @@ Function Compare-SchemaJson {
     #$constSpecsDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
     #$schemaSupsDest = Search-Resources -XPath "/SchemaSupportedLocales" -ExpectedObjectType SchemaSupportedLocales
 
+    # Makes target a json and then converts it to an object
     $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
     $objsDest = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     $bindingsDest = Get-ObjectsFromConfig -ObjectType BindingDescription
@@ -262,6 +263,7 @@ Function Get-ObjectsFromConfig {
     )
     # This looks for objectTypes and expects objects with the type ObjectType
     $objects = Search-Resources -Xpath "/$ObjectType" -ExpectedObjectType $ObjectType
+    # Makes target a json and then converts it to an object
     $updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
     $object = ConvertFrom-Json -InputObject $updatedObjs
     return $object

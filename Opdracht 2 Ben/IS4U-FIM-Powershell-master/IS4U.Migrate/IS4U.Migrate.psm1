@@ -82,15 +82,19 @@ Function Compare-Schema {
     $cstspecifiersSource = Get-ObjectsFromXml -XmlFilePath "ConfigConstSpecifiers.xml"
     
     # Target Setup objects, comparing purposes
-    $attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
-    $objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
-    $bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
-    $cstspecifiersDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
+    #$attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
+    #$objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
+    #$bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
+    #$cstspecifiersDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
+    $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    $objsDest = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
+    $bindingsDest = Get-ObjectsFromConfig -ObjectType BindingDescription
+    $cstspecifiersDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest
     Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest
-    Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest
+    Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType")
     Compare-Objects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest
     Write-Host "Compare of Schema configuration completed."
 }
@@ -221,29 +225,16 @@ function Get-ObjectsFromConfig {
         $ObjectType
     )
     $objects = Search-Resources -XPath "/$ObjectType" -ExpectedObjectType $ObjectType
-    <#foreach($obj in $objects) {
-        #Write-Host $obj.Arr.GetType().Name
-        $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
-        $arrMember = $objMembers | Where-Object{$_.Value.GetType().Name -eq "AttributeValueArrayList"}
-        Write-Host $arrMember
-        if ($arrMember) {
-            foreach($mem in $objMembers){
-                if ($arrMember -eq $mem) {
-                    write-host "arrMember $arrMember"
-                    $mem.Value = $arrMember.Value
-                    $mem.Value = [System.Collections.ArrayList]$mem.Value
-                }
-                if ($arrMember.Value.Count -eq 1 -and $arrMember -eq $mem) {
-                    Write-Host "Single object in array found"
-                    $mem = [String]$arrMember[0]
-                }
-            }
-        }
-        #Write-Host $obj.Arr.GetType().Name
-        $obj = $objMembers
-    }#>
-    $objects | Export-Clixml -Path "tempConfig.xml" -Depth 4
-    $objects = Import-Clixml "tempConfig.xml"
+    # converts search-resources return to clixml format
+    # Compare had troubles because of different types after serialize
+    # Source and Destination MIM-Setup get compared with objects that both have been serialized and deserialized
+    if ($objects) {
+        Write-ToCliXml -Objects $objects -xmlName Temp   
+        $objects = Import-Clixml "tempConfig.xml"
+    } else {
+        #$objects | Export-Clixml -Path "tempConfig.xml" -Depth 4
+        Write-Host "No objects found to write to clixml!"
+    }
     return $objects
 }
 
@@ -260,21 +251,7 @@ Function Write-ToCliXml {
         [String]
         $xmlName
     )
-    # remove PsCustomObjects properties we don't need
-    foreach ($obj in $Objects) {
-        $objMembers = $obj.psobject.Members | Where-Object MemberType -like 'noteproperty'
-        $arrMember = $objMembers | Where-Object{$_.GetType().Name -eq "AttributeValueArrayList"}
-        if ($arrMember -and $arrMember.Count -eq 1) {
-            $objMember = $objMembers | Where-Object{$_.GetType().Name -eq "AttributeValueArrayList"}
-            foreach($mem in $objMembers){
-                if ($mem -eq $objMember) {
-                    $mem = @($objMember)
-                }
-            }
-        }
-        $obj = $objMembers
-    }
-    $Objects | Export-Clixml -Path "Config$xmlName.xml" -Depth 4
+    Export-Clixml -InputObject $Objects -Path "Config$xmlName.xml" -Depth 4 
 }
 
 Function Get-ObjectsFromXml {
@@ -295,31 +272,46 @@ Function Compare-Objects {
 
         [Parameter(Mandatory=$True)]
         [array]
-        $ObjsDestination
+        $ObjsDestination,
+
+        [Parameter(Mandatory=$False)]
+        [Array]
+        $Anchor = @("Name")
     )
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
-        Write-Host $obj -BackgroundColor Green -ForegroundColor Black
-        $obj2 = $ObjsDestination | Where-Object {$_.Name -eq $obj.Name}
-        Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
+        if ($Anchor.Count -eq 1) {
+            $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
+        } else { # When ObjectType is BindingDescription or has mutliple anchors needed to find one object
+            $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -eq $obj.($Anchor[0]) -and `
+            $_.($Anchor[1]) -eq $obj.($Anchor[1])}
+        }
         if (!$obj2) {
             Write-Host "New object found:"
-            Write-Host $obj
+            Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
-            $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
-            $compObj = $compObj | Where-Object membertype -like 'noteproperty'
-            $newObj = [PsCustomObject] @{} #nodig?
-            foreach($prop in $compObj){
-                $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+            if ($compResult) {
+                Write-Host $obj -BackgroundColor Green -ForegroundColor Black
+                Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
+                $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
+                $compObj = $compObj | Where-Object membertype -like 'noteproperty'
+                $newObj = [PsCustomObject] @{}
+                foreach($prop in $compObj){
+                    $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+                }
+                Write-host "Different object properties found:"
+                Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
+                $difference.Add($newObj)
             }
-            Write-host "Different object properties:"
-            Write-host $newObj   
-            $difference.Add($newObj)
         }
     }
-    Write-ToXmlFile -DifferenceObjects $Difference
+    if ($difference) {
+        Write-ToXmlFile -DifferenceObjects $Difference
+    } else {
+        Write-Host "No differences found!" -ForegroundColor Green
+    }
 }
 
 Function Write-ToXmlFile {
