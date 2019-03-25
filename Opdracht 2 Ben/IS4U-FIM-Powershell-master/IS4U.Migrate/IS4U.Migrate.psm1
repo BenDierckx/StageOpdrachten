@@ -62,7 +62,7 @@ Function Start-Migration {
             if ($ImportSchema) {
                 Compare-Schema
             }
-            if ($ImportPolict) {
+            if ($ImportPolicy) {
                 Compare-Policy
             }
             if ($ImportPortal) {
@@ -140,6 +140,7 @@ Function Compare-Portal {
     $srchScopeSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSearchScope.xml"
     $objVisSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigObjectVisual.xml"
     $homePSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigHomePage.xml"
+    $configSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigur.xml"
 
     # Target Setup objects, comparing purposes
     $UIDest = Search-Resources -XPath "/PortalUIConfiguration" -ExpectedObjectType PortalUIConfiguration
@@ -147,6 +148,7 @@ Function Compare-Portal {
     $srchScopeDest = Search-Resources -XPath "/SearchScopeConfiguration" -ExpectedObjectType SearchScopeConfiguration
     $objVisDest = Search-Resources -XPath "/ObjectVisualizationConfiguration" -ExpectedObjectType ObjectVisualizationConfiguration
     $homePDest = Search-Resources -XPath "/HomepageConfiguration" -ExpectedObjectType HomepageConfiguration
+    $configDest = Search-Resources -XPath "/Configuration" -ExpectedObjectType Configuration
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $UISrc -ObjsDestination $UIDest
@@ -154,6 +156,7 @@ Function Compare-Portal {
     Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest
     Compare-Objects -ObjsSource $objVisSrc -ObjsDestination $objVisDest
     Compare-Objects -ObjsSource $homePSrc -ObjsDestination $homePDest
+    Compare-Objects -ObjsSource $configSrc -ObjsDestination $configDest
     Write-Host "Compare of Portal configuration completed."
 }
 
@@ -186,8 +189,10 @@ Function Get-PolicyConfigToXml {
     Write-ToCliXml -Objects $emailtmplt -xmlName EmailTemplates 
     Write-ToCliXml -Objects $filterscope -xmlName FilterScopes 
     Write-ToCliXml -Objects $activityInfo -xmlName ActivityInfo 
-    Write-ToCliXml -Objects $funct -xmlName PolicyFunctions 
-    Write-ToCliXml -Objects $syncRule -xmlName SyncRules 
+    Write-ToCliXml -Objects $funct -xmlName PolicyFunctions
+    if ($syncRule) {
+        Write-ToCliXml -Objects $syncRule -xmlName SyncRules  
+    }
     Write-ToCliXml -Objects $syncFilter -xmlName SyncFilters 
 }
 
@@ -197,12 +202,16 @@ Function Get-PortalConfigToXml {
     $searchScope = Get-ObjectsFromConfig -ObjectType SearchScopeConfiguration
     $objVisual = Get-ObjectsFromConfig -ObjectType ObjectVisualizationConfiguration
     $homePage = Get-ObjectsFromConfig -ObjectType HomepageConfiguration
+    $configuration = Get-ObjectsFromConfig -ObjectType Configuration
 
     Write-ToCliXml -Objects $portalUI -xmlName PortalUI
     Write-ToCliXml -Objects $navBar -xmlName NavBar 
     Write-ToCliXml -Objects $searchScope -xmlName SearchScope 
     Write-ToCliXml -Objects $objVisual -xmlName ObjectVisual 
     Write-ToCliXml -Objects $homePage -xmlName HomePage
+    if($configuration){
+        Write-ToCliXml -Objects $configuration -xmlName configur
+    }
 }
 
 function Get-ObjectsFromConfig {
@@ -212,10 +221,35 @@ function Get-ObjectsFromConfig {
         $ObjectType
     )
     $objects = Search-Resources -XPath "/$ObjectType" -ExpectedObjectType $ObjectType
+    <#foreach($obj in $objects) {
+        #Write-Host $obj.Arr.GetType().Name
+        $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
+        $arrMember = $objMembers | Where-Object{$_.Value.GetType().Name -eq "AttributeValueArrayList"}
+        Write-Host $arrMember
+        if ($arrMember) {
+            foreach($mem in $objMembers){
+                if ($arrMember -eq $mem) {
+                    write-host "arrMember $arrMember"
+                    $mem.Value = $arrMember.Value
+                    $mem.Value = [System.Collections.ArrayList]$mem.Value
+                }
+                if ($arrMember.Value.Count -eq 1 -and $arrMember -eq $mem) {
+                    Write-Host "Single object in array found"
+                    $mem = [String]$arrMember[0]
+                }
+            }
+        }
+        #Write-Host $obj.Arr.GetType().Name
+        $obj = $objMembers
+    }#>
+    $objects | Export-Clixml -Path "tempConfig.xml" -Depth 4
+    $objects = Import-Clixml "tempConfig.xml"
     return $objects
 }
 
 # Csv problem: Arrays in the PsCustomObjects do not get the required depth
+# CliXml problems: Array of 1 object gets serialized to string
+#                  AttributeValueArrayList gets deserialized to ArrayList from xml
 Function Write-ToCliXml {
     param(
         [Parameter(Mandatory=$True)]
@@ -228,7 +262,16 @@ Function Write-ToCliXml {
     )
     # remove PsCustomObjects properties we don't need
     foreach ($obj in $Objects) {
-        $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
+        $objMembers = $obj.psobject.Members | Where-Object MemberType -like 'noteproperty'
+        $arrMember = $objMembers | Where-Object{$_.GetType().Name -eq "AttributeValueArrayList"}
+        if ($arrMember -and $arrMember.Count -eq 1) {
+            $objMember = $objMembers | Where-Object{$_.GetType().Name -eq "AttributeValueArrayList"}
+            foreach($mem in $objMembers){
+                if ($mem -eq $objMember) {
+                    $mem = @($objMember)
+                }
+            }
+        }
         $obj = $objMembers
     }
     $Objects | Export-Clixml -Path "Config$xmlName.xml" -Depth 4
@@ -256,20 +299,25 @@ Function Compare-Objects {
     )
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
+        Write-Host $obj -BackgroundColor Green -ForegroundColor Black
         $obj2 = $ObjsDestination | Where-Object {$_.Name -eq $obj.Name}
+        Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
         if (!$obj2) {
+            Write-Host "New object found:"
+            Write-Host $obj
             $difference.Add($obj)
+        } else {
+            $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
+            $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
+            $compObj = $compObj | Where-Object membertype -like 'noteproperty'
+            $newObj = [PsCustomObject] @{} #nodig?
+            foreach($prop in $compObj){
+                $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+            }
+            Write-host "Different object properties:"
+            Write-host $newObj   
+            $difference.Add($newObj)
         }
-        $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
-        $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference from original!
-        $compObj = $compObj | Where-Object membertype -like 'noteproperty'
-        $newObj = [PsCustomObject] @{}
-        foreach($prop in $compObj){
-            $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
-           }
-        Write-host "Different object:"
-        Write-host $newObj   
-        $difference.Add($newObj)
     }
     Write-ToXmlFile -DifferenceObjects $Difference
 }

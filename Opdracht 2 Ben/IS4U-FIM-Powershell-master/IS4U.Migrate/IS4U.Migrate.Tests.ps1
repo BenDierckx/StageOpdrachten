@@ -56,4 +56,29 @@ Describe "Compare-Objects" {
     }
 }
 
+Describe "Get-ObjectsFromConfig" {
+    mock Search-Resources {
+        $objs = @(
+            [PSCustomObject]@{
+                Test = [string]"t"
+                Arr = [Lithnet.ResourceManagement.Automation.AttributeValueArrayList]@("test", "member")
+            },
+            [PSCustomObject]@{
+                Test = "t"
+                Arr = [Lithnet.ResourceManagement.Automation.AttributeValueArrayList]@("single")
+            },
+            [PSCustomObject]@{
+                Test = "Value0"
+                Arr = [Lithnet.ResourceManagement.Automation.AttributeValueArrayList]@()
+            }
+        )
+        return $objs
+    } -ModuleName "IS4U.Migrate"
+    $result = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    foreach($obj in $result){
+        Write-host $obj.Arr.GetType().Name
+    }
+    Write-Host $result
+}
+
 # Set-ExecutionPolicy -Scope Process Unrestricted
