@@ -75,7 +75,7 @@
     # NestedModules = @()
     
     # Functions to export from this module
-    FunctionsToExport = 'Start-Migration', 'Get-SchemaConfigToJson', 'Get-PolicyConfigToJson', 'Get-PortalConfigToJson', 'Compare-Schema', 'Compare-Policy', 'Compare-Portal', 'Get-ObjectsFromConfig', 'Convert-ToJson', 'Get-ObjectsFromJson', 'Compare-Objects', 'Write-ToXmlFile', 'Import-Delta'
+    FunctionsToExport = 'Start-MigrationJson', 'Get-SchemaConfigToJson', 'Get-PolicyConfigToJson', 'Get-PortalConfigToJson', 'Compare-SchemaJson', 'Compare-PolicyJson', 'Compare-PortalJson', 'Get-ObjectsFromConfig', 'Convert-ToJson', 'Get-ObjectsFromJson', 'Compare-Objects', 'Write-ToXmlFile', 'Import-Delta'
     
     # Cmdlets to export from this module
     CmdletsToExport = ''

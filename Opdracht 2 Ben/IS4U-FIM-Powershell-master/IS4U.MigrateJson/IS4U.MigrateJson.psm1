@@ -22,7 +22,7 @@ if(!(Get-Module -Name LithnetRMA)) {
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 
-Function Start-Migration {
+Function Start-MigrationJson {
     param(
         # Source?
         [Parameter(Mandatory=$False)]
@@ -86,13 +86,13 @@ Function Get-SchemaConfigToJson {
     #$schemaSup = Get-ObjectsFromConfig -ObjectType SchemaSupportedLocales
 
     Convert-ToJson -Objects $attrs -JsonName Attributes
-    Convert-ToJson -Objects $objs -JsonName objects
+    Convert-ToJson -Objects $objs -JsonName objectTypes
     Convert-ToJson -Objects $binds -JsonName Bindings
     Convert-ToJson -Objects $constSpec -JsonName ConstantSpecifiers
     #Convert-ToJson -Objects $schemaSup -JsonName SchemaSupportedLocales
 }
 
-Function Compare-Schema {
+Function Compare-SchemaJson {
     Write-Host "Starting compare of Schema configuration..."
     # Source of objects to be imported
     $attrsSource = Get-ObjectsFromJson -JsonFilePath "ConfigAttributes.json"
@@ -102,11 +102,16 @@ Function Compare-Schema {
     #$schemaSupsSource = Get-ObjectsFromJson -JsonFilePath "SchemaSupportedLocales.json"
     
     # Target Setup objects, comparing purposes
-    $attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
-    $objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
-    $bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
-    $constSpecsDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
+    #$attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
+    #$objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
+    #$bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
+    #$constSpecsDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
     #$schemaSupsDest = Search-Resources -XPath "/SchemaSupportedLocales" -ExpectedObjectType SchemaSupportedLocales
+
+    $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    $objsDest = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
+    $bindingsDest = Get-ObjectsFromConfig -ObjectType BindingDescription
+    $constSpecsDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest
@@ -147,21 +152,21 @@ Function Get-PolicyConfigToJson {
     Convert-ToJson -Objects $syncFilter -JsonName SynchronizationFilter
 }
 
-Function Compare-Policy {
+Function Compare-PolicyJson {
     Write-Host "Starting compare of Policy configuration..."
     # Source of objects to be imported
-    $mgmntPlciesSrc = Get-ObjectsFromJson -xmlFilePath "ConfigPolicies.json"
-    $setsSrc = Get-ObjectsFromJson -xmlFilePath "ConfigSets.json"
-    $workflowSrc = Get-ObjectsFromJson -xmlFilePath "ConfigWorkflows.json"
-    $emailSrc = Get-ObjectsFromJson -xmlFilePath "ConfigEmailTemplates.json"
-    $filtersSrc = Get-ObjectsFromJson -xmlFilePath "ConfigFilterScopes.json"
-    $activitySrc = Get-ObjectsFromJson -xmlFilePath "ConfigActivityInfo.json"
-    $funcSrc = Get-ObjectsFromJson -xmlFilePath "ConfigPolicyFunctions.json"
-    $syncRSrc = Get-ObjectsFromJson -xmlFilePath "ConfigSyncRules.json"
-    $syncFSrc = Get-ObjectsFromJson -xmlFilePath "ConfigSyncFilters.json"
+    $mgmntPlciesSrc = Get-ObjectsFromJson -JsonFilePath "ConfigPolicies.json"
+    $setsSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSets.json"
+    $workflowSrc = Get-ObjectsFromJson -JsonFilePath "ConfigWorkflows.json"
+    $emailSrc = Get-ObjectsFromJson -JsonFilePath "ConfigEmailTemplates.json"
+    $filtersSrc = Get-ObjectsFromJson -JsonFilePath "ConfigFilterScopes.json"
+    $activitySrc = Get-ObjectsFromJson -JsonFilePath "ConfigActivityInfo.json"
+    $funcSrc = Get-ObjectsFromJson -JsonFilePath "ConfigPolicyFunctions.json"
+    $syncRSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSyncRules.json"
+    $syncFSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSyncFilters.json"
 
     # Target Setup objects, comparing purposes
-    $mgmntPlciesDest = Search-Resources -XPath "/ManagementPolicyRule" -ExpectedObjectType ManagementPolicyRule
+    <#$mgmntPlciesDest = Search-Resources -XPath "/ManagementPolicyRule" -ExpectedObjectType ManagementPolicyRule
     $setsDest = Search-Resources -XPath "/Set" -ExpectedObjectType Set
     $workflowDest = Search-Resources -XPath "/WorkflowDefinition" -ExpectedObjectType WorkflowDefinition
     $emailDest = Search-Resources -XPath "/EmailTemplate" -ExpectedObjectType EmailTemplate
@@ -169,7 +174,17 @@ Function Compare-Policy {
     $activityDest = Search-Resources -XPath "/ActivityInformationConfiguration" -ExpectedObjectType ActivityInformationConfiguration
     $funcDest = Search-Resources -XPath "/Function" -ExpectedObjectType Function 
     $syncRDest = Search-Resources -XPath "/SynchronizationRule" -ExpectedObjectType SynchronizationRule
-    $syncFDest = Search-Resources -XPath "/SynchronizationFilter" -ExpectedObjectType SynchronizationFilter
+    $syncFDest = Search-Resources -XPath "/SynchronizationFilter" -ExpectedObjectType SynchronizationFilter#>
+
+    $mgmntPlciesDest = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
+    $setsDest = Get-ObjectsFromConfig -ObjectType Set
+    $workflowDest = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
+    $emailDest = Get-ObjectsFromConfig -ObjectType EmailTemplate
+    $filtersDest = Get-ObjectsFromConfig -ObjectType FilterScope
+    $activityDest = Get-ObjectsFromConfig -ObjectType ActivityInformationConfiguration
+    $funcDest = Get-ObjectsFromConfig -ObjectType Function 
+    $syncRDest = Get-ObjectsFromConfig -ObjectType SynchronizationRule
+    $syncFDest = Get-ObjectsFromConfig -ObjectType SynchronizationFilter
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest
@@ -208,21 +223,27 @@ Function Get-PortalConfigToJson {
     Convert-ToJson -Objects $objectVisualConf -JsonName ObjectVisualizationConfigurations
 }
 
-Function Compare-Portal {
+Function Compare-PortalJson {
     Write-Host "Starting compare of Portal configuration..."
     # Source of objects to be imported
-    $UISrc = Get-ObjectsFromJson -xmlFilePath "ConfigPortalUI.json"
-    $navSrc = Get-ObjectsFromJson -xmlFilePath "ConfigNavBar.json"
-    $srchScopeSrc = Get-ObjectsFromJson -xmlFilePath "ConfigSearchScope.json"
-    $objVisSrc = Get-ObjectsFromJson -xmlFilePath "ConfigObjectVisual.json"
-    $homePSrc = Get-ObjectsFromJson -xmlFilePath "ConfigHomePage.json"
+    $UISrc = Get-ObjectsFromJson -JsonFilePath "ConfigPortalUI.json"
+    $navSrc = Get-ObjectsFromJson -JsonFilePath "ConfigNavBar.json"
+    $srchScopeSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSearchScope.json"
+    $objVisSrc = Get-ObjectsFromJson -JsonFilePath "ConfigObjectVisual.json"
+    $homePSrc = Get-ObjectsFromJson -JsonFilePath "ConfigHomePage.json"
 
     # Target Setup objects, comparing purposes
-    $UIDest = Search-Resources -XPath "/PortalUIConfiguration" -ExpectedObjectType PortalUIConfiguration
+    <#$UIDest = Search-Resources -XPath "/PortalUIConfiguration" -ExpectedObjectType PortalUIConfiguration
     $navDest = Search-Resources -XPath "/NavigationBarConfiguration" -ExpectedObjectType NavigationBarConfiguration
     $srchScopeDest = Search-Resources -XPath "/SearchScopeConfiguration" -ExpectedObjectType SearchScopeConfiguration
     $objVisDest = Search-Resources -XPath "/ObjectVisualizationConfiguration" -ExpectedObjectType ObjectVisualizationConfiguration
-    $homePDest = Search-Resources -XPath "/HomepageConfiguration" -ExpectedObjectType HomepageConfiguration
+    $homePDest = Search-Resources -XPath "/HomepageConfiguration" -ExpectedObjectType HomepageConfiguration#>
+
+    $UIDest = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
+    $navDest = Get-ObjectsFromConfig -ObjectType NavigationBarConfiguration
+    $srchScopeDest = Get-ObjectsFromConfig -ObjectType SearchScopeConfiguration
+    $objVisDest = Get-ObjectsFromConfig -ObjectType ObjectVisualizationConfiguration
+    $homePDest = Get-ObjectsFromConfig -ObjectType HomepageConfiguration
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $UISrc -ObjsDestination $UIDest
@@ -241,7 +262,9 @@ Function Get-ObjectsFromConfig {
     )
     # This looks for objectTypes and expects objects with the type ObjectType
     $objects = Search-Resources -Xpath "/$ObjectType" -ExpectedObjectType $ObjectType
-    return $objects
+    $updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
+    $object = ConvertFrom-Json -InputObject $updatedObjs
+    return $object
 }
 
 Function Convert-ToJson {
@@ -259,7 +282,7 @@ Function Convert-ToJson {
         $objMembers = $obj.psobject.members | Where-Object membertype -Like 'noteproperty'
         $obj = $objMembers
     }
-    ConvertTo-Json -InputObject $Objects -Depth 4 -Compress | Out-File "./$JsonName.json"
+    ConvertTo-Json -InputObject $Objects -Depth 4 -Compress | Out-File "./Config$JsonName.json"
 }
 
 Function Get-ObjectsFromJson {
@@ -291,6 +314,8 @@ Function Compare-Objects {
             $difference.Add($obj)
         }
         else {
+            Write-Host $obj -BackgroundColor Black
+            Write-Host $obj2 -BackgroundColor Yellow -ForegroundColor Black
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
             $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference from original!
             $compObj = $compObj | Where-Object membertype -like 'noteproperty'
@@ -299,7 +324,7 @@ Function Compare-Objects {
                 $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
             }
             Write-host "Different object:"
-            Write-host $newObj   
+            #Write-host $newObj   
             $difference.Add($newObj)
         }
     }
