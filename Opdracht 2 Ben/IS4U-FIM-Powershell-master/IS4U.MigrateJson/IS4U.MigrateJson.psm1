@@ -323,7 +323,7 @@ Function Write-ToXmlFile {
         $Doc.AppendChild($dec)
         $startNode = $Doc.AppendChild($initalElement)
         $startNode.AppendChild($operationsElement)
-        $Doc.Save("./IS4U.Migrate/configurationDelta.xml")
+        $Doc.Save("./IS4U.MigrateJson/configurationDelta.xml")
     }
     if (!(Test-Path -Path $FileName)) {
         Write-Host "File not found"
@@ -394,7 +394,7 @@ Function Write-ToXmlFile {
         }
     }
     # Save the xml 
-    $XmlDoc.Save("./IS4U.Migrate/ConfigurationDelta.xml")
+    $XmlDoc.Save("./IS4U.MigrateJson/ConfigurationDelta.xml")
     # Confirmation
     Write-Host "Written differences in objects to the delta xml file(ConfiurationDelta.xml)"
     # Return the new xml 
