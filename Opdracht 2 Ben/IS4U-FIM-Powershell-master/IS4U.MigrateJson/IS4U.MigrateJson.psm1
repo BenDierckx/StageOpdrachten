@@ -22,6 +22,56 @@ if(!(Get-Module -Name LithnetRMA)) {
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 
+Function Start-Migration {
+    param(
+        # Source?
+        [Parameter(Mandatory=$False)]
+        [Bool]
+        $SourceOfMIMSetup = $False,
+        
+        [Parameter(Mandatory=$False)]
+        [Bool]
+        $ImportAllConfigurations = $true,
+        
+        [Parameter(Mandatory=$False)]
+        [Bool]
+        $ImportSchema=$False,
+        
+        [Parameter(Mandatory=$FAlse)]
+        [Bool]
+        $ImportPolicy = $False,
+        
+        [Parameter(Mandatory=$False)]
+        [Bool]
+        $ImportPortal = $False
+    )
+    if ($SourceOfMIMSetup) {
+        Get-SchemaConfigToJson
+        Get-PortalConfigToJson
+        Get-PolicyConfigToJson
+    } else {
+        if ($ImportSchema -or $ImportPolicy -or $ImportPortal) {
+            $ImportAllConfigurations = $False
+        }
+        if ($ImportAllConfigurations) {
+            Compare-Schema
+            Compare-Portal
+            Compare-Policy
+        } else {
+            if ($ImportSchema) {
+                Compare-Schema
+            }
+            if ($ImportPolicy) {
+                Compare-Policy
+            }
+            if ($ImportPortal) {
+                Compare-Portal
+            }
+        }
+        Import-Delta -DeltaConfigFilePath "ConfigurationDelta.json"
+    }
+}
+
 Function Get-SchemaConfigToJson {
     param(
         [Parameter(Mandatory=$False)]
@@ -240,16 +290,18 @@ Function Compare-Objects {
         if (!$obj2) {
             $difference.Add($obj)
         }
-        $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
-        $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference from original!
-        $compObj = $compObj | Where-Object membertype -like 'noteproperty'
-        $newObj = [PsCustomObject] @{}
-        foreach($prop in $compObj){
-            $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
-           }
-        Write-host "Different object:"
-        Write-host $newObj   
-        $difference.Add($newObj)
+        else {
+            $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
+            $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference from original!
+            $compObj = $compObj | Where-Object membertype -like 'noteproperty'
+            $newObj = [PsCustomObject] @{}
+            foreach($prop in $compObj){
+                $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
+            }
+            Write-host "Different object:"
+            Write-host $newObj   
+            $difference.Add($newObj)
+        }
     }
     Write-ToXmlFile -DifferenceObject $difference
 }
