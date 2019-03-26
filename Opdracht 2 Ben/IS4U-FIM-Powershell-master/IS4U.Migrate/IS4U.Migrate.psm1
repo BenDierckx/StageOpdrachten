@@ -38,7 +38,7 @@ Function Start-Migration {
         [Bool]
         $ImportSchema=$False,
         
-        [Parameter(Mandatory=$FAlse)]
+        [Parameter(Mandatory=$False)]
         [Bool]
         $ImportPolicy = $False,
         
@@ -92,28 +92,32 @@ Function Compare-Schema {
     $cstspecifiersDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
 
     # Comparing of the Source and Target Setup to create delta xml file
+    Write-Host "0%..."
     Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest
+    Write-Host "25%..."
     Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest
+    Write-Host "50%..."
     Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType")
-    Compare-Objects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest
+    Write-Host "75%..."
+    Compare-Objects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest -Anchor @("BoundAttributeType", "BoundObjectType")
     Write-Host "Compare of Schema configuration completed."
 }
 
 Function Compare-Policy {
     Write-Host "Starting compare of Policy configuration..."
     # Source of objects to be imported
-    $mgmntPlciesSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigPolicies.xml"
-    $setsSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSets.xml"
-    $workflowSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigWorkflows.xml"
-    $emailSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigEmailTemplates.xml"
-    $filtersSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigFilterScopes.xml"
-    $activitySrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigActivityInfo.xml"
-    $funcSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigPolicyFunctions.xml"
-    $syncRSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSyncRules.xml"
-    $syncFSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSyncFilters.xml"
+    $mgmntPlciesSrc = Get-ObjectsFromXml -xmlFilePath "ConfigPolicies.xml"
+    $setsSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSets.xml"
+    $workflowSrc = Get-ObjectsFromXml -xmlFilePath "ConfigWorkflows.xml"
+    $emailSrc = Get-ObjectsFromXml -xmlFilePath "ConfigEmailTemplates.xml"
+    $filtersSrc = Get-ObjectsFromXml -xmlFilePath "ConfigFilterScopes.xml"
+    $activitySrc = Get-ObjectsFromXml -xmlFilePath "ConfigActivityInfo.xml"
+    $funcSrc = Get-ObjectsFromXml -xmlFilePath "ConfigPolicyFunctions.xml"
+    $syncRSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSyncRules.xml"
+    $syncFSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSyncFilters.xml"
 
     # Target Setup objects, comparing purposes
-    $mgmntPlciesDest = Search-Resources -XPath "/ManagementPolicyRule" -ExpectedObjectType ManagementPolicyRule
+    <#$mgmntPlciesDest = Search-Resources -XPath "/ManagementPolicyRule" -ExpectedObjectType ManagementPolicyRule
     $setsDest = Search-Resources -XPath "/Set" -ExpectedObjectType Set
     $workflowDest = Search-Resources -XPath "/WorkflowDefinition" -ExpectedObjectType WorkflowDefinition
     $emailDest = Search-Resources -XPath "/EmailTemplate" -ExpectedObjectType EmailTemplate
@@ -121,17 +125,35 @@ Function Compare-Policy {
     $activityDest = Search-Resources -XPath "/ActivityInformationConfiguration" -ExpectedObjectType ActivityInformationConfiguration
     $funcDest = Search-Resources -XPath "/Function" -ExpectedObjectType Function 
     $syncRDest = Search-Resources -XPath "/SynchronizationRule" -ExpectedObjectType SynchronizationRule
-    $syncFDest = Search-Resources -XPath "/SynchronizationFilter" -ExpectedObjectType SynchronizationFilter
+    $syncFDest = Search-Resources -XPath "/SynchronizationFilter" -ExpectedObjectType SynchronizationFilter#>
+    $mgmntPlciesDest = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
+    $setsDest = Get-ObjectsFromConfig -ObjectType Set
+    $workflowDest = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
+    $emailDest = Get-ObjectsFromConfig -ObjectType EmailTemplate
+    $filtersDest = Get-ObjectsFromConfig -ObjectType FilterScope
+    $activityDest = Get-ObjectsFromConfig -ObjectType ActivityInformationConfiguration
+    $funcDest = Get-ObjectsFromConfig -ObjectType Function 
+    $syncRDest = Get-ObjectsFromConfig -ObjectType SynchronizationRule
+    $syncFDest = Get-ObjectsFromConfig -ObjectType SynchronizationFilter
 
     # Comparing of the Source and Target Setup to create delta xml file
+    Write-Host "0%..."
     Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest
+    Write-Host "11.1%..."
     Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest
+    Write-Host "22.2%..."
     Compare-Objects -ObjsSource $workflowSrc -ObjsDestination $workflowDest
+    Write-Host "33.2%..."
     Compare-Objects -ObjsSource $emailSrc -ObjsDestination $emailDest 
+    Write-Host "44.4%..."
     Compare-Objects -ObjsSource $filtersSrc -ObjsDestination $filtersDest
+    Write-Host "55.5%..."
     Compare-Objects -ObjsSource $activitySrc -ObjsDestination $activityDest
+    Write-Host "66.6%..."
     Compare-Objects -ObjsSource $funcSrc -ObjsDestination $funcDest
+    Write-Host "77.7%..."
     Compare-Objects -ObjsSource $syncRSrc -ObjsDestination $syncRDest
+    Write-Host "88.8%..."
     Compare-Objects -ObjsSource $syncFSrc -ObjsDestination $syncFDest
     Write-Host "Compare of Policy configuration completed."
 }
@@ -139,27 +161,39 @@ Function Compare-Policy {
 Function Compare-Portal {
     Write-Host "Starting compare of Portal configuration..."
     # Source of objects to be imported
-    $UISrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigPortalUI.xml"
-    $navSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigNavBar.xml"
-    $srchScopeSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigSearchScope.xml"
-    $objVisSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigObjectVisual.xml"
-    $homePSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigHomePage.xml"
-    $configSrc = Get-ObjectsFromXml -xmlFilePath "xmlConfigur.xml"
+    $UISrc = Get-ObjectsFromXml -xmlFilePath "ConfigPortalUI.xml"
+    $navSrc = Get-ObjectsFromXml -xmlFilePath "ConfigNavBar.xml"
+    $srchScopeSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSearchScope.xml"
+    $objVisSrc = Get-ObjectsFromXml -xmlFilePath "ConfigObjectVisual.xml"
+    $homePSrc = Get-ObjectsFromXml -xmlFilePath "ConfigHomePage.xml"
+    $configSrc = Get-ObjectsFromXml -xmlFilePath "ConfigConfigur.xml"
 
     # Target Setup objects, comparing purposes
-    $UIDest = Search-Resources -XPath "/PortalUIConfiguration" -ExpectedObjectType PortalUIConfiguration
+    <#$UIDest = Search-Resources -XPath "/PortalUIConfiguration" -ExpectedObjectType PortalUIConfiguration
     $navDest = Search-Resources -XPath "/NavigationBarConfiguration" -ExpectedObjectType NavigationBarConfiguration
     $srchScopeDest = Search-Resources -XPath "/SearchScopeConfiguration" -ExpectedObjectType SearchScopeConfiguration
     $objVisDest = Search-Resources -XPath "/ObjectVisualizationConfiguration" -ExpectedObjectType ObjectVisualizationConfiguration
     $homePDest = Search-Resources -XPath "/HomepageConfiguration" -ExpectedObjectType HomepageConfiguration
-    $configDest = Search-Resources -XPath "/Configuration" -ExpectedObjectType Configuration
+    $configDest = Search-Resources -XPath "/Configuration" -ExpectedObjectType Configuration#>
+    $UIDest = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
+    $navDest = Get-ObjectsFromConfig -ObjectType NavigationBarConfiguration
+    $srchScopeDest = Get-ObjectsFromConfig -ObjectType SearchScopeConfiguration
+    $objVisDest = Get-ObjectsFromConfig -ObjectType ObjectVisualizationConfiguration
+    $homePDest = Get-ObjectsFromConfig -ObjectType HomepageConfiguration
+    $configDest = Get-ObjectsFromConfig -ObjectType Configuration
 
     # Comparing of the Source and Target Setup to create delta xml file
+    Write-Host "0%..."
     Compare-Objects -ObjsSource $UISrc -ObjsDestination $UIDest
+    Write-Host "16.6%..."
     Compare-Objects -ObjsSource $navSrc -ObjsDestination $navDest
+    Write-Host "33.2%..."
     Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest
+    Write-Host "49.8%..."
     Compare-Objects -ObjsSource $objVisSrc -ObjsDestination $objVisDest
+    Write-Host "66.4%..."
     Compare-Objects -ObjsSource $homePSrc -ObjsDestination $homePDest
+    Write-Host "83%..."
     Compare-Objects -ObjsSource $configSrc -ObjsDestination $configDest
     Write-Host "Compare of Portal configuration completed."
 }
@@ -214,7 +248,7 @@ Function Get-PortalConfigToXml {
     Write-ToCliXml -Objects $objVisual -xmlName ObjectVisual 
     Write-ToCliXml -Objects $homePage -xmlName HomePage
     if($configuration){
-        Write-ToCliXml -Objects $configuration -xmlName configur
+        Write-ToCliXml -Objects $configuration -xmlName Configur
     }
 }
 
@@ -230,7 +264,7 @@ function Get-ObjectsFromConfig {
     # Source and Destination MIM-Setup get compared with objects that both have been serialized and deserialized
     if ($objects) {
         Write-ToCliXml -Objects $objects -xmlName Temp   
-        $objects = Import-Clixml "tempConfig.xml"
+        $objects = Import-Clixml "ConfigTemp.xml"
     } else {
         #$objects | Export-Clixml -Path "tempConfig.xml" -Depth 4
         Write-Host "No objects found to write to clixml!"
@@ -283,8 +317,8 @@ Function Compare-Objects {
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
         } else { # When ObjectType is BindingDescription or has mutliple anchors needed to find one object
-            $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -eq $obj.($Anchor[0]) -and `
-            $_.($Anchor[1]) -eq $obj.($Anchor[1])}
+            $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
+            $_.($Anchor[1]) -like $obj.($Anchor[1])}
         }
         if (!$obj2) {
             Write-Host "New object found:"
