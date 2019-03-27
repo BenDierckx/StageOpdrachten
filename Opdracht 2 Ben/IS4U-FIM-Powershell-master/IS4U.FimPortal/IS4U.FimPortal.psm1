@@ -664,7 +664,7 @@ Function Add-AttributeToMpr {
 	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $MprName
 	$resource.ActionParameter += $AttrName
 	#Save-Resource $resource
-	return $resource
+	return $resource	## Fot testing
 }
 
 Function Remove-AttributeFromMpr {
@@ -695,7 +695,7 @@ Function Remove-AttributeFromMpr {
 	$tempArray = $resource.ActionParameter -ne $AttrName	# temparray without parameter AttrName
 	$resource.ActionParameter = $tempArray					# fill resource with parameters without AttrName
 	#Save-Resource $resource
-	return $resource
+	return $resource	## For testing
 }
 
 Function New-Set {
