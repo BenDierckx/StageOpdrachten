@@ -75,8 +75,8 @@
     # NestedModules = @()
     
     # Functions to export from this module
-    FunctionsToExport = 'Start-Migration', 'Compare-Schema', 'Compare-Policy', 'Compare-Portal', 'Get-SchemaConfigToCsv',
-    'Get-PolicyConfigToCsv', 'Get-PortalConfigToCsv', 'Get-ObjectsFromConfig', 'Write-ToCsv', 'Get-ObjectsFromCsv', 'Compare-Objects', 
+    FunctionsToExport = 'Start-Migration', 'Compare-Schema', 'Compare-Policy', 'Compare-Portal', 'Get-SchemaConfigToXml',
+    'Get-PolicyConfigToXml', 'Get-PortalConfigToXml', 'Get-ObjectsFromConfig', 'Write-ToCliXml', 'Get-ObjectsFromXml', 'Compare-MimObjects', 
     'Write-ToXmlFile', 'Import-Delta'
     
     # Cmdlets to export from this module

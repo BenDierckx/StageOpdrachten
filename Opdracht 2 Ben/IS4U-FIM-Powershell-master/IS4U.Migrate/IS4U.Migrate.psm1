@@ -93,13 +93,13 @@ Function Compare-Schema {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Write-Host "0%..."
-    Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest
+    Compare-MimObjects -ObjsSource $attrsSource -ObjsDestination $attrsDest
     Write-Host "25%..."
-    Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest
+    Compare-MimObjects -ObjsSource $objsSource -ObjsDestination $objsDest
     Write-Host "50%..."
-    Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType")
+    Compare-MimObjects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType")
     Write-Host "75%..."
-    Compare-Objects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey")
+    Compare-MimObjects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey")
     Write-Host "Compare of Schema configuration completed."
 }
 
@@ -138,25 +138,25 @@ Function Compare-Policy {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Write-Host "0%..."
-    Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName")
     Write-Host "11.1%..."
-    Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName")
     Write-Host "22.2%..."
-    Compare-Objects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName")
     Write-Host "33.2%..."
-    Compare-Objects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName")
     Write-Host "44.4%..."
-    Compare-Objects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName")
     Write-Host "55.5%..."
-    Compare-Objects -ObjsSource $activitySrc -ObjsDestination $activityDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $activitySrc -ObjsDestination $activityDest -Anchor @("DisplayName")
     Write-Host "66.6%..."
-    Compare-Objects -ObjsSource $funcSrc -ObjsDestination $funcDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $funcSrc -ObjsDestination $funcDest -Anchor @("DisplayName")
     Write-Host "77.7%..."
     if ($syncRSrc) {
-    Compare-Objects -ObjsSource $syncRSrc -ObjsDestination $syncRDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $syncRSrc -ObjsDestination $syncRDest -Anchor @("DisplayName")
     Write-Host "88.8%..."
     }
-    Compare-Objects -ObjsSource $syncFSrc -ObjsDestination $syncFDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $syncFSrc -ObjsDestination $syncFDest -Anchor @("DisplayName")
     Write-Host "Compare of Policy configuration completed."
 }
 
@@ -186,18 +186,18 @@ Function Compare-Portal {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Write-Host "0%..."
-    Compare-Objects -ObjsSource $UISrc -ObjsDestination $UIDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $UISrc -ObjsDestination $UIDest -Anchor @("DisplayName")
     Write-Host "16.6%..."
-    Compare-Objects -ObjsSource $navSrc -ObjsDestination $navDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $navSrc -ObjsDestination $navDest -Anchor @("DisplayName")
     Write-Host "33.2%..."
-    Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order")
+    Compare-MimObjects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order")
     Write-Host "49.8%..."
-    Compare-Objects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName")
     Write-Host "66.4%..."
-    Compare-Objects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName")
     Write-Host "83%..."
     if ($configSrc -and $configDest) {
-        Compare-Objects -ObjsSource $configSrc -ObjsDestination $configDest -Anchor @("DisplayName") # Can be empty
+        Compare-MimObjects -ObjsSource $configSrc -ObjsDestination $configDest -Anchor @("DisplayName") # Can be empty
     }
     
     Write-Host "Compare of Portal configuration completed."
@@ -264,7 +264,7 @@ function Get-ObjectsFromConfig {
         $ObjectType
     )
     $objects = Search-Resources -XPath "/$ObjectType" -ExpectedObjectType $ObjectType
-    # converts search-resources return to clixml format
+    # converts return of search-resources to clixml format
     # Compare had troubles because of different types after serialize
     # Source and Destination MIM-Setup get compared with objects that both have been serialized and deserialized
     if ($objects) {
@@ -303,7 +303,7 @@ Function Get-ObjectsFromXml {
     return $objs
 }
 
-Function Compare-Objects {
+Function Compare-MimObjects {
     param (
         [Parameter(Mandatory=$True)]
         [array]
@@ -321,10 +321,10 @@ Function Compare-Objects {
     foreach ($obj in $ObjsSource){
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
-        } elseif ($Anchor.Count -eq 2) { # When ObjectType is BindingDescription or has mutliple anchors needed to find one object
+        } elseif ($Anchor.Count -eq 2) { # When ObjectType is BindingDescription or needs two anchors to find one object
             $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
             $_.($Anchor[1]) -like $obj.($Anchor[1])}
-        } else {
+        } else {    # When ObjectType needs multiple anchors to find unique object
             $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
             $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
         }
@@ -333,6 +333,21 @@ Function Compare-Objects {
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
+            # remove ObjectID's in case they are different
+            #$ReferenceObject = $False
+            $objObjectID = $obj.psobject.members.Value.ObjectID # ?
+            $obj2objectID = $obj2.psobject.members.Value.ObjectID # ?
+            $obj.psobject.properties.Remove("ObjectID")
+            $obj2.psobject.properties.Remove("ObjectID")
+            <#
+            if ($obj.psobject.properties.Members.Value.Name -contains "BoundAttributeType" -or 
+            $obj.psobject.properties.Members.Value.Name -contains "BoundObjectType") {
+                $obj.psobject.properties.remove("BoundAttributeType")
+                $obj.psobject.properties.remove("BoundObjectType")
+                $obj2.psobject.properties.remove("BoundAttributeType")
+                $obj2.psobject.properties.remove("BoundObjectType")
+                $ReferenceObject = $True
+            }#>
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
             if ($compResult) {
                 Write-Host $obj -BackgroundColor Green -ForegroundColor Black
@@ -345,6 +360,12 @@ Function Compare-Objects {
                 }
                 Write-host "Different object properties found:"
                 Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
+                # Give ObjectID back to the object difference
+                $newObj | Add-Member -NotePropertyName "ObjectID" -NotePropertyValue $objObjectID 
+                <#if ($ReferenceObject) {
+                    $newObj | Add-Member -NotePropertyName "BoundAttributeType" -NotePropertyValue ""
+                    $newObj | Add-Member -NotePropertyName "BoundObjectType" -NotePropertyValue ""
+                }#>
                 $difference.Add($newObj)
             }
         }
