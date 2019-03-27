@@ -377,7 +377,7 @@ Function Compare-Objects {
         }
     }
     if ($difference) {
-        Write-ToXmlFile -DifferenceObjects $Difference -path $path
+        Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
     }
@@ -388,6 +388,10 @@ Function Write-ToXmlFile {
         [Parameter(Mandatory=$True)]
         [System.Collections.ArrayList]
         $DifferenceObjects,
+
+        [Parameter(Mandatory=$False)]
+        [Array]
+        $Anchor,
 
         [Parameter(Mandatory = $True)]
         [String]
@@ -433,9 +437,11 @@ Function Write-ToXmlFile {
             $XmlAnchors.AppendChild($xmlElement1)
             $XmlAnchors.AppendChild($xmlElement2)
         } else {
-        $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
-        $xmlElement.Set_InnerText("Name")
-        $XmlAnchors.AppendChild($xmlElement)
+            foreach($anch in $Anchor) {
+                $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
+                $xmlElement.Set_InnerText($anch)
+                $XmlAnchors.AppendChild($xmlElement)
+            }
         }
         # Attributes of the object
         $xmlEle = $XmlDoc.CreateElement("AttributeOperations")
