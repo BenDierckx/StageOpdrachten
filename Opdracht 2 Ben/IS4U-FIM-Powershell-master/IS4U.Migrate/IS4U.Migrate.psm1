@@ -15,6 +15,10 @@ here: http://opensource.org/licenses/gpl-3.0.
 #>
 Set-StrictMode -Version Latest
 
+<#
+    Nog te beschrijven: Alleen deze module gebruiken door een Powershell prompt te openen in dezelfde folder aan beide kanten!!
+#>
+
 #region Lithnet
 if(!(Get-Module -Name LithnetRMA))
 {
@@ -51,29 +55,35 @@ Function Start-Migration {
         Get-PortalConfigToXml
         Get-PolicyConfigToXml
     } else {
+        $path = Select-FolderDialog
         if ($ImportSchema -or $ImportPolicy -or $ImportPortal) {
             $ImportAllConfigurations = $False
         }
         if ($ImportAllConfigurations) {
-            Compare-Schema
-            Compare-Portal
-            Compare-Policy
+            Compare-Schema -path $path
+            Compare-Portal -path $path
+            Compare-Policy -path $path
         } else {
             if ($ImportSchema) {
-                Compare-Schema
+                Compare-Schema -path $path
             }
             if ($ImportPolicy) {
-                Compare-Policy
+                Compare-Policy -path $path
             }
             if ($ImportPortal) {
-                Compare-Portal
+                Compare-Portal -path $path
             }
         }
-        Import-Delta -DeltaConfigFilePath "ConfigurationDelta.xml"
+        Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.xml"
     }
 }
 
 Function Compare-Schema {
+    param(
+        [Parameter(Mandatory=$True)]
+        [String]
+        $Path
+    )
     Write-Host "Starting compare of Schema configuration..."
     # Source of objects to be imported
     $attrsSource = Get-ObjectsFromXml -XmlFilePath "ConfigAttributes.xml"
@@ -93,17 +103,23 @@ Function Compare-Schema {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Write-Host "0%..."
-    Compare-MimObjects -ObjsSource $attrsSource -ObjsDestination $attrsDest
+    Compare-MimObjects -ObjsSource $attrsSource -ObjsDestination $attrsDest -path $path
     Write-Host "25%..."
-    Compare-MimObjects -ObjsSource $objsSource -ObjsDestination $objsDest
+    Compare-MimObjects -ObjsSource $objsSource -ObjsDestination $objsDest -path $path
     Write-Host "50%..."
-    Compare-MimObjects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType")
+    Compare-MimObjects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType") -path $path
     Write-Host "75%..."
-    Compare-MimObjects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey")
+    Compare-MimObjects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest `
+    -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey") -path $path
     Write-Host "Compare of Schema configuration completed."
 }
 
 Function Compare-Policy {
+    param(
+        [Parameter(Mandatory=$true)]
+        [String]
+        $path
+    )
     Write-Host "Starting compare of Policy configuration..."
     # Source of objects to be imported
     $mgmntPlciesSrc = Get-ObjectsFromXml -xmlFilePath "ConfigPolicies.xml"
@@ -138,29 +154,34 @@ Function Compare-Policy {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Write-Host "0%..."
-    Compare-MimObjects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName") -path $path
     Write-Host "11.1%..."
-    Compare-MimObjects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
     Write-Host "22.2%..."
-    Compare-MimObjects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName") -path $path
     Write-Host "33.2%..."
-    Compare-MimObjects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName") -path $path
     Write-Host "44.4%..."
-    Compare-MimObjects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName") -path $path
     Write-Host "55.5%..."
-    Compare-MimObjects -ObjsSource $activitySrc -ObjsDestination $activityDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $activitySrc -ObjsDestination $activityDest -Anchor @("DisplayName") -path $path
     Write-Host "66.6%..."
-    Compare-MimObjects -ObjsSource $funcSrc -ObjsDestination $funcDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $funcSrc -ObjsDestination $funcDest -Anchor @("DisplayName") -path $path
     Write-Host "77.7%..."
     if ($syncRSrc) {
-    Compare-MimObjects -ObjsSource $syncRSrc -ObjsDestination $syncRDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $syncRSrc -ObjsDestination $syncRDest -Anchor @("DisplayName") -path $path
     Write-Host "88.8%..."
     }
-    Compare-MimObjects -ObjsSource $syncFSrc -ObjsDestination $syncFDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $syncFSrc -ObjsDestination $syncFDest -Anchor @("DisplayName") -path $path
     Write-Host "Compare of Policy configuration completed."
 }
 
 Function Compare-Portal {
+    param(
+        [Parameter(Mandatory=$True)]
+        [String]
+        $path
+    )
     Write-Host "Starting compare of Portal configuration..."
     # Source of objects to be imported
     $UISrc = Get-ObjectsFromXml -xmlFilePath "ConfigPortalUI.xml"
@@ -186,18 +207,18 @@ Function Compare-Portal {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Write-Host "0%..."
-    Compare-MimObjects -ObjsSource $UISrc -ObjsDestination $UIDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $UISrc -ObjsDestination $UIDest -Anchor @("DisplayName") -path $path
     Write-Host "16.6%..."
-    Compare-MimObjects -ObjsSource $navSrc -ObjsDestination $navDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $navSrc -ObjsDestination $navDest -Anchor @("DisplayName") -path $path
     Write-Host "33.2%..."
-    Compare-MimObjects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order")
+    Compare-MimObjects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order") -path $path
     Write-Host "49.8%..."
-    Compare-MimObjects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName") -path $path
     Write-Host "66.4%..."
-    Compare-MimObjects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName")
+    Compare-MimObjects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName") -path $path
     Write-Host "83%..."
     if ($configSrc -and $configDest) {
-        Compare-MimObjects -ObjsSource $configSrc -ObjsDestination $configDest -Anchor @("DisplayName") # Can be empty
+        Compare-MimObjects -ObjsSource $configSrc -ObjsDestination $configDest -Anchor @("DisplayName") -path $path # Can be empty
     }
     
     Write-Host "Compare of Portal configuration completed."
@@ -315,7 +336,11 @@ Function Compare-MimObjects {
 
         [Parameter(Mandatory=$False)]
         [Array]
-        $Anchor = @("Name")
+        $Anchor = @("Name"),
+        
+        [Parameter(Mandatory=$true)]
+        [String]
+        $path
     )
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
@@ -336,7 +361,6 @@ Function Compare-MimObjects {
             # remove ObjectID's in case they are different
             #$ReferenceObject = $False
             $objObjectID = $obj.psobject.members.Value.ObjectID # ?
-            $obj2objectID = $obj2.psobject.members.Value.ObjectID # ?
             $obj.psobject.properties.Remove("ObjectID")
             $obj2.psobject.properties.Remove("ObjectID")
             <#
@@ -371,7 +395,7 @@ Function Compare-MimObjects {
         }
     }
     if ($difference) {
-        Write-ToXmlFile -DifferenceObjects $Difference
+        Write-ToXmlFile -DifferenceObjects $Difference -path $path
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
     }
@@ -381,20 +405,24 @@ Function Write-ToXmlFile {
     param (
         [Parameter(Mandatory=$True)]
         [System.Collections.ArrayList]
-        $DifferenceObjects
+        $DifferenceObjects,
+
+        [Parameter(Mandatory = $True)]
+        [String]
+        $path
     )
     # Inititalization xml file
-    $FileName = "configurationDelta.xml"
+    $FileName = "$path/configurationDelta.xml"
     # Create empty starting lithnet configuration xml file
     if (!(Test-Path -Path $FileName)) {
         [xml]$Doc = New-Object System.Xml.XmlDocument
         $initalElement = $Doc.CreateElement("Lithnet.ResourceManagement.ConfigSync")
         $operationsElement = $Doc.CreateElement("Operations")
-        $dec = $Doc.CreateXmlDeclaration("1.0","UTF-8",$null)
-        $Doc.AppendChild($dec)
+        $declaration = $Doc.CreateXmlDeclaration("1.0","UTF-8",$null)
+        $Doc.AppendChild($declaration)
         $startNode = $Doc.AppendChild($initalElement)
         $startNode.AppendChild($operationsElement)
-        $Doc.Save("./IS4U.Migrate/configurationDelta.xml")
+        $Doc.Save($FileName)
     }
     if (!(Test-Path -Path $FileName)) {
         Write-Host "File not found"
@@ -434,13 +462,15 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
-            if ($member.Value.GetType().BaseType.Name -eq "Array") {  ## aangepast, beziet altijd of het array is of niet
-                foreach ($m in $member.Value) {
-                    $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
-                    $xmlVarElement.Set_InnerText($m)
-                    $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                    $xmlVariable.SetAttribute("operation", "add") # add because we don't want to replace the items 
-                    $xmlVariable.SetAttribute("name", $member.Name)
+            if($member.Value){
+                if ($member.Value.GetType().BaseType.Name -eq "Array") {  ## aangepast, beziet altijd of het array is of niet
+                    foreach ($m in $member.Value) {
+                        $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
+                        $xmlVarElement.Set_InnerText($m)
+                        $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                        $xmlVariable.SetAttribute("operation", "add") # add because we don't want to replace the items 
+                        $xmlVariable.SetAttribute("name", $member.Name)
+                    }
                 }
             }
             # Attributes that are read only do not get implemented in the xml file
@@ -451,7 +481,7 @@ Function Write-ToXmlFile {
             # referencing purposes, no need in the attributes itself (Lithnet does this)
             if ($member.Name -eq "ObjectID") {
                 # set the objectID of the object as the id of the xml node
-                $XmlOperation.SetAttribute("id", $member.Value)
+                $XmlOperation.SetAttribute("id", $member.Value.Value)
                 continue # Import-RmConfig creates an objectID in the new setup
             }
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
@@ -465,13 +495,29 @@ Function Write-ToXmlFile {
         }
     }
     # Save the xml 
-    $XmlDoc.Save("./IS4U.Migrate/ConfigurationDelta.xml")
+    $XmlDoc.Save($FileName) #path nog na te zien!!!!!!!!!!!
     # Confirmation
-    Write-Host "Written differences in objects to the delta xml file(ConfiurationDelta.xml)"
+    Write-Host "Written differences in objects to the delta xml file (ConfiurationDelta.xml)"
     # Return the new xml 
     #[xml]$result = $XmlDoc | Select-Xml -XPath "//ResourceOperation[@resourceType='$ObjectType']"
     #[xml]$result = [System.Xml.XmlDocument] (Get-Content ".\$ObjectType.xml")
     #return $result
+}
+
+# Voor zelf folder te laten selecteren?
+# bron: https://stackoverflow.com/questions/11412617/get-a-folder-path-from-the-explorer-menu-to-a-powershell-variable
+Function Select-FolderDialog{
+    [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null     
+
+    $objForm = New-Object System.Windows.Forms.FolderBrowserDialog
+    $objForm.Rootfolder = "Desktop"
+    $objForm.Description = "Select folder to save the ConfigurationDelta.xml"
+    $Show = $objForm.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost = $true }))
+    If ($Show -eq "OK") {
+        Return $objForm.SelectedPath
+    } Else {
+        Write-Error "Operation cancelled by user."
+    }
 }
 
 Function Import-Delta {
