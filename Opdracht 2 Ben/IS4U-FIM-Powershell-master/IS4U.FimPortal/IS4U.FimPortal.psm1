@@ -461,16 +461,11 @@ Function New-Mpr {
 	#$resource.DisplayName = $DisplayName
 	$global:resource = New-Resource -ObjectType ManagementPolicyRule
 	foreach ($boundparam in $PSBoundParameters.GetEnumerator()) {
-		if ($boundparam.key -eq "ActionParameter") {
+		if ($boundparam.key -eq "ActionParameter" -or $boundparam.key -eq "ActionType") {
 			foreach ($item in $boundparam) {
 				$global:resource.($boundparam.key) += $item.value				#Array
 			}
 		} 
-		elseif ($boundparam.key -eq "ActionType") {
-			foreach ($item in $boundparam) {
-				$global:resource.($boundparam.key) += $item.value				#Array
-			}
-		}
 		else {
 			$global:resource.($boundparam.key) = $boundparam.value				#Variable
 		}
@@ -560,7 +555,14 @@ Function Update-Mpr {
 	#[GUID] $id = Get-FimObjectID -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	$global:resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	foreach ($boundparam in $PSBoundParameters.GetEnumerator()) {
-		$global:resource.($boundparam.key) = $boundparam.value				#Variable
+		if ($boundparam.key -eq "ActionParameter" -or $boundparam.key -eq "ActionType") {
+			foreach ($item in $boundparam) {
+				$global:resource.($boundparam.key) += $item.value				#Array
+			}
+		} 
+		else {
+			$global:resource.($boundparam.key) = $boundparam.value				#Variable
+		}
 	}
 	#Save-Resource $resource
 	$id = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName -AttributesToGet ID ##-AttributesToGet ObjectID
@@ -608,7 +610,7 @@ Function Enable-Mpr {
 	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	$resource.Disabled = $false
 	#Save-Resource $resource
-	return $resource
+	return $resource	## For testing
 }
 
 Function Disable-Mpr {
@@ -633,7 +635,7 @@ Function Disable-Mpr {
 	$resource = Get-Resource -ObjectType ManagementPolicyRule -AttributeName DisplayName -AttributeValue $DisplayName
 	$resource.Disabled = $true
 	#Save-Resource $resource
-	return $resource
+	return $resource	## For testing
 }
 
 Function Add-AttributeToMpr {
