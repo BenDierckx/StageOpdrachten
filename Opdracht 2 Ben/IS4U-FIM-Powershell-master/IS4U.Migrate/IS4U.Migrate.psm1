@@ -16,10 +16,6 @@ here: http://opensource.org/licenses/gpl-3.0.
 Set-StrictMode -Version Latest
 
 <#
-    ToDo:   * Global variabelen om objectid's op te slagen (voor referenties)
-            * Referenties linken aan globale variabele voor de 2 omgevingen
-            * Testen in omgeving met elke type
-            * (objectid als anchors gebruiken)
     Nog te beschrijven: Alleen deze module gebruiken door een Powershell prompt te openen in dezelfde folder aan beide kanten!!
 #>
 
@@ -33,6 +29,7 @@ Import-Module LithnetRMA;
 
 Function Start-Migration {
     param(
+        # Source?
         [Parameter(Mandatory=$False)]
         [Bool]
         $SourceOfMIMSetup = $False,
@@ -54,7 +51,8 @@ Function Start-Migration {
         $ImportPortal = $False
     )
 
-    $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); $DestRefObjs = [System.Collections.ArrayList]@()}
+    $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList] @();
+    SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
 
     if ($SourceOfMIMSetup) {
         Get-SchemaConfigToXml
@@ -80,12 +78,12 @@ Function Start-Migration {
                 Compare-Portal -path $path
             }
         }
-        Remove-Variable -Name $global:ReferentialList
-        if (Test-Path -Path "$path/ConfigurationDelta.xml") {
+        Remove-Variable ReferentialList 
+        if (Test-Path -Path "$Path/ConfigurationDelta.xml") {
             Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.xml"
         } else {
-            Write-Host "No ConfigurationDelta file found: Not created or no differences found!"
-        }
+            Write-Host "No configurationDelta file found: Not created or no differences."
+        } 
     }
 }
 
@@ -98,7 +96,13 @@ Function Compare-Schema {
     Write-Host "Starting compare of Schema configuration..."
     # Source of objects to be imported
     $attrsSource = Get-ObjectsFromXml -XmlFilePath "ConfigAttributes.xml"
+    foreach($obj in $attrsSource) {
+        $global:ReferentialList.SourceRefAttrs.Add($obj)
+    }
     $objsSource = Get-ObjectsFromXml -XmlFilePath "ConfigObjectTypes.xml"
+    foreach($obj in $objsSource) {
+        $global:ReferentialList.SourceRefObjs.Add($obj)
+    }
     $bindingsSource = Get-ObjectsFromXml -XmlFilePath "ConfigBindings.xml"
     $cstspecifiersSource = Get-ObjectsFromXml -XmlFilePath "ConfigConstSpecifiers.xml"
     
@@ -108,7 +112,13 @@ Function Compare-Schema {
     #$bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
     #$cstspecifiersDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
     $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    foreach($obj in $attrsDest) {
+        $global:ReferentialList.DestRefAttrs.Add($obj)
+    }
     $objsDest = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
+    foreach($obj in $objsDest) {
+        $global:ReferentialList.DestRefObjs.Add($obj)
+    }
     $bindingsDest = Get-ObjectsFromConfig -ObjectType BindingDescription
     $cstspecifiersDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
 
@@ -306,11 +316,6 @@ function Get-ObjectsFromConfig {
         #$objects | Export-Clixml -Path "tempConfig.xml" -Depth 4
         Write-Host "No objects found to write to clixml!"
     }
-    foreach($obj in $objects) {
-        if ($obj.ObjectType -eq "AttributeTypeDescription" -or $obj.ObjectType -eq "ObjectTypeDescription") {
-            $global:ReferentialList.DestRefObjs.Add($obj)
-        }
-    }
     return $objects
 }
 
@@ -337,11 +342,6 @@ Function Get-ObjectsFromXml {
         $xmlFilePath
     )
     $objs = Import-Clixml -Path $xmlFilePath
-    foreach($obj in $objs) {
-        if ($obj.ObjectType -eq "AttributeTypeDescription" -or $obj.ObjectType -eq "ObjectTypeDescription") {
-            $global:ReferentialList.SourceRefObjs.Add($obj)
-        }
-    }
     return $objs
 }
 
@@ -363,43 +363,44 @@ Function Compare-MimObjects {
         [String]
         $path
     )
+    $i = 1
+    $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
+        Write-Host "Comparing ($i/$total)"
+        $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
         } elseif ($Anchor.Count -eq 2) {
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
-                # Get corresponding object from the source (xml files). Search on ObjectID
-                $RefToAttrSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID -eq $obj.BoundAttributeType}
-                # Get-Resource for corresponding object from the target Schema
-                $RefToAttrDest = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $RefToAttrSrc.Name
-                # Get the object from the target schema
-                #$RefToAttrDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.ObjectID -eq $TempAttrDest.BoundAttributeType}
+                $RefToAttrSrc = $global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
+                $RefToAttrDest = $global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
+                #$RefToAttrDest = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $RefToAttrSrc.Name
 
-                $refToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID -eq $obj.BoundObjectType}
-                $RefToObjDest = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $refToObjSrc.Name
-                #$refToObjDest = $global:ReferentialList | Where-Object{$_.ObjectID -eq $TempObjDest.BoundObjectType}
-                
-                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.BoundAttributeType -and 
-                $_.BoundObjectType -like $RefToObjDest.BoundObjectType}
+                $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
+                $RefTOObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
+                #$RefToObjDest = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $RefToObjSrc.Name
+
+                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
+                $_.BoundObjectType -like $RefToObjDest.ObjectID}
             } else {
-                $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and
-                $_.($Anchor[1]) -like $obj.($Anchor[1])}   
+                $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and 
+                $_.($Anchor[1]) -like $obj.($Anchor[1])}
             }
         } else {
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
-                $RefToAttrSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID -eq $obj.BoundAttributeType}
-                $RefToAttrDest = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $RefToAttrSrc.Name
-                #$RefToAttrDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.ObjectID -eq $TempAttrDest.BoundAttributeType}
+                $RefToAttrSrc = $global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
+                $RefToAttrDest = $global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
+                #$RefToAttrDest = Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $RefToAttrSrc.Name
 
-                $refToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID -eq $obj.BoundObjectType}
-                $RefToObjDest = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $refToObjSrc.Name
-                #$RefToObjDest = $global:ReferentialList | Where-Object{$_.ObjectID -eq $TempObjDest.BoundObjectType}
-                
-                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.BoundAttributeType -and
-                $_.BoundObjectType -like $RefToObjDest.BoundObjectType -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+                $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
+                $RefTOObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
+                #$RefToObjDest = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $RefToObjSrc.Name
+
+                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
+                $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
             } else {
-                $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and
+                $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and 
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
             }
         }
@@ -408,24 +409,12 @@ Function Compare-MimObjects {
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
-            # remove ObjectID's in case they are different
-            #$ReferenceObject = $False
-            #$objObjectID = $obj2.ObjectID # ?
-            # Alter the original ObjectID to match the target ObjectID
-            $obj.psobject.properties.Remove("ObjectID")
-            $obj | Add-Member -NotePropertyName ObjectID -NotePropertyValue $obj2.ObjectID
-            # Use id's from target configuration ...
-            if ($obj.psobject.properties.Members.Value.Name -contains "BoundAttributeType" -and
-            $obj.psobject.properties.Members.Value.Name -contains "BoundObjectType") {
-                $obj.psobject.properties.remove("BoundAttributeType")
-                $obj.psobject.properties.remove("BoundObjectType")
-                obj | Add-Member -NotePropertyName BoundAttributeType -NotePropertyValue $obj2.BoundAttributeType
-                obj | Add-Member -NotePropertyName BoundObjectType -NotePropertyValue $obj2.BoundObjectType
-                #$obj2.psobject.properties.remove("BoundAttributeType")
-                #$obj2.psobject.properties.remove("BoundObjectType")
-                #$ReferenceObject = $True
+            $obj.ObjectID = $obj2.ObjectID
+            
+            if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+                $obj.BoundAttributeType = $obj2.BoundAttributeType
+                $obj.BoundObjectType = $obj2.BoundObjectType
             }
-
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
             if ($compResult) {
                 Write-Host $obj -BackgroundColor Green -ForegroundColor Black
@@ -438,12 +427,6 @@ Function Compare-MimObjects {
                 }
                 Write-host "Different object properties found:"
                 Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
-                # Give ObjectID back to the object difference
-                #$newObj | Add-Member -NotePropertyName "ObjectID" -NotePropertyValue $objObjectID 
-                <#if ($ReferenceObject) {
-                    $newObj | Add-Member -NotePropertyName "BoundAttributeType" -NotePropertyValue ""
-                    $newObj | Add-Member -NotePropertyName "BoundObjectType" -NotePropertyValue ""
-                }#>
                 $difference.Add($newObj)
             }
         }
@@ -464,7 +447,7 @@ Function Write-ToXmlFile {
         [Parameter(Mandatory = $True)]
         [String]
         $path,
-        
+
         [Parameter(Mandatory=$True)]
         [Array]
         $Anchor
@@ -490,7 +473,7 @@ Function Write-ToXmlFile {
     $node = $XmlDoc.SelectSingleNode('//Operations')
 
     # Place objects in XML file
-    # Iterate over the array of PsCustomObjects
+    # Iterate over the array of arrays of PsCustomObjects
     foreach ($obj in $DifferenceObjects) {
         # Operation description
         $xmlElement = $XmlDoc.CreateElement("ResourceOperation")
@@ -514,7 +497,6 @@ Function Write-ToXmlFile {
                 $xmlElement.Set_InnerText($anch)
                 $XmlAnchors.AppendChild($xmlElement)
             }
-        
         }
         # Attributes of the object
         $xmlEle = $XmlDoc.CreateElement("AttributeOperations")
@@ -523,23 +505,23 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
+            if($member.Value){
+                if ($member.Value.GetType().BaseType.Name -eq "ArrayList") { 
+                    foreach ($m in $member.Value) {
+                        $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
+                        $xmlVarElement.Set_InnerText($m)
+                        $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                        $xmlVariable.SetAttribute("operation", "add")
+                        $xmlVariable.SetAttribute("name", $member.Name)
+                    }
+                    continue
+                }
+            }
             # Attributes that are read only do not get implemented in the xml file
             $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
              "ExpectedRulesList", "ResourceTime", "ComputedMember")
             # Skip read only attributes and ObjectType (already used in ResourceOperation)
             if ($illegalMembers -contains $member.Name) { continue }
-            if($member.Value){
-                if ($member.Value.GetType().BaseType.Name -eq "Array") {  ## aangepast, beziet altijd of het array is of niet
-                    foreach ($m in $member.Value) {
-                        $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
-                        $xmlVarElement.Set_InnerText($m)
-                        $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                        $xmlVariable.SetAttribute("operation", "add") # add because we don't want to replace the items 
-                        $xmlVariable.SetAttribute("name", $member.Name)
-                    }
-                    continue    # Rest is not needed after array
-                }
-            }
             # referencing purposes, no need in the attributes itself (Lithnet does this)
             if ($member.Name -eq "ObjectID") {
                 # set the objectID of the object as the id of the xml node
@@ -559,14 +541,14 @@ Function Write-ToXmlFile {
     # Save the xml 
     $XmlDoc.Save($FileName) #path nog na te zien!!!!!!!!!!!
     # Confirmation
-    Write-Host "Written differences in objects to the delta xml file (ConfiurationDelta.xml)"
+    Write-Host "Written differences in objects to the delta xml file (ConfigurationDelta.xml)"
     # Return the new xml 
     #[xml]$result = $XmlDoc | Select-Xml -XPath "//ResourceOperation[@resourceType='$ObjectType']"
     #[xml]$result = [System.Xml.XmlDocument] (Get-Content ".\$ObjectType.xml")
     #return $result
 }
 
-# Voor zelf folder te laten selecteren
+# Voor zelf folder te laten selecteren?
 # bron: https://stackoverflow.com/questions/11412617/get-a-folder-path-from-the-explorer-menu-to-a-powershell-variable
 Function Select-FolderDialog{
     [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null     
