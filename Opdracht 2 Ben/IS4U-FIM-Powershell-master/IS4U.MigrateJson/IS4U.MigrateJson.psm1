@@ -54,6 +54,7 @@ Function Start-MigrationJson {
         Get-PortalConfigToJson
         Get-PolicyConfigToJson
     } else {
+        $path = Select-FolderDialog
         if ($ImportSchema -or $ImportPolicy -or $ImportPortal) {
             $ImportAllConfigurations = $False
         }
@@ -72,7 +73,7 @@ Function Start-MigrationJson {
                 Compare-Portal -path $path
             }
         }
-        Remove-Variable ReferentialList
+        Remove-Variable ReferentialList -Scope Global
         if (Test-Path -Path "$path/ConfigurationDelta.json") {
             Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.json"
         } else {
@@ -326,11 +327,9 @@ Function Get-ObjectsFromConfig {
     # This looks for objectTypes and expects objects with the type ObjectType
     $objects = Search-Resources -Xpath "/$ObjectType" -ExpectedObjectType $ObjectType
     # Makes target a json and then converts it to an object
-    #$updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
-    #$object = ConvertFrom-Json -InputObject $updatedObjs
     if ($objects) {
-        Convert-ToJson -Objects $objects -JsonName Temp
-        $objects = ConvertFrom-Json "ConfigTemp.json"
+        $updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
+        $object = ConvertFrom-Json -InputObject $updatedObjs
     } else {
         Write-Host "No objects found to write to json"
     }
@@ -579,7 +578,7 @@ Function Select-FolderDialog{
     If ($Show -eq "OK") {
         Return $objForm.SelectedPath
     } Else {
-        Write-Error "Operation cancelled by user."
+        Write-Error "Operation cancelled by user." -ErrorAction Stop
     }
 }
 
