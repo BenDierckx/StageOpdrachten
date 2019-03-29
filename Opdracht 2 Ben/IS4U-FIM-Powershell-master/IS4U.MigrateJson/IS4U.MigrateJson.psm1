@@ -45,6 +45,10 @@ Function Start-MigrationJson {
         [Bool]
         $ImportPortal = $False
     )
+
+    $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
+    SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
+
     if ($SourceOfMIMSetup) {
         Get-SchemaConfigToJson
         Get-PortalConfigToJson
@@ -68,7 +72,12 @@ Function Start-MigrationJson {
                 Compare-Portal -path $path
             }
         }
-        Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.json"
+        Remove-Variable ReferentialList
+        if (Test-Path -Path "$path/ConfigurationDelta.json") {
+            Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.json"
+        } else {
+            Write-Host "No configurationDelta file found: Not created or no differences."
+        }
     }
 }
 
@@ -101,7 +110,13 @@ Function Compare-SchemaJson {
     Write-Host "Starting compare of Schema configuration..."
     # Source of objects to be imported
     $attrsSource = Get-ObjectsFromJson -JsonFilePath "ConfigAttributes.json"
+    foreach($obj in $attrsSource) {
+        $Global:ReferentialList.SourceRefAttrs.Add($obj)
+    }
     $objsSource = Get-ObjectsFromJson -JsonFilePath "ConfigObjectTypes.json"
+    foreach($obj in $objsSource) {
+        $Global:ReferentialList.SourceRefObjs.Add($obj)
+    }
     $bindingsSource = Get-ObjectsFromJson -JsonFilePath "ConfigBindings.json"
     $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstSpecifiers.json"
     #$schemaSupsSource = Get-ObjectsFromJson -JsonFilePath "SchemaSupportedLocales.json"
@@ -115,14 +130,24 @@ Function Compare-SchemaJson {
 
     # Makes target a json and then converts it to an object
     $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    foreach($obj in $attrsDest) {
+        $Global:ReferentialList.DestRefAttrs.Add($obj)
+    }
     $objsDest = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
+    foreach($obj in $objsDest) {
+        $Global:ReferentialList.DestRefObjs.Add($obj)
+    }
     $bindingsDest = Get-ObjectsFromConfig -ObjectType BindingDescription
     $constSpecsDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
 
     # Comparing of the Source and Target Setup to create delta xml file
+    Write-Host "0%"
     Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest -path $path
+    Write-Host "25%"
     Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest -path $path
+    Write-Host "50%"
     Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType") -path $path
+    Write-Host "75%"
     Compare-Objects -ObjsSource $constSpecsSource -ObjsDestination $constSpecsDest -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey") -path $path
     #Compare-Objects -ObjsSource $schemaSupsSource -ObjsDestination $schemaSupsDest
     Write-Host "Compare of Schema configuration completed."
@@ -198,14 +223,25 @@ Function Compare-PolicyJson {
     $syncFDest = Get-ObjectsFromConfig -ObjectType SynchronizationFilter
 
     # Comparing of the Source and Target Setup to create delta xml file
+    Write-Host "0%"
     Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName") -path $path
+    Write-Host "11%"
     Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
+    Write-Host "22%"
     Compare-Objects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName") -path $path
+    Write-Host "33%"
     Compare-Objects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName") -path $path
+    Write-Host "44%"
     Compare-Objects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName") -path $path
+    Write-Host "55%"
     Compare-Objects -ObjsSource $activitySrc -ObjsDestination $activityDest -Anchor @("DisplayName") -path $path
+    Write-Host "66%"
     Compare-Objects -ObjsSource $funcSrc -ObjsDestination $funcDest -Anchor @("DisplayName") -path $path
-    Compare-Objects -ObjsSource $syncRSrc -ObjsDestination $syncRDest -Anchor @("DisplayName") -path $path
+    Write-Host "77%"
+    if ($syncRSrc) {
+        Compare-Objects -ObjsSource $syncRSrc -ObjsDestination $syncRDest -Anchor @("DisplayName") -path $path
+        Write-Host "88%"
+    }
     Compare-Objects -ObjsSource $syncFSrc -ObjsDestination $syncFDest -Anchor @("DisplayName") -path $path
     Write-Host "Compare of Policy configuration completed."
 }
@@ -264,11 +300,17 @@ Function Compare-PortalJson {
     $confDest = Get-ObjectsFromConfig -ObjectType Configuration
 
     # Comparing of the Source and Target Setup to create delta xml file
+    Write-Host "0%..."
     Compare-Objects -ObjsSource $UISrc -ObjsDestination $UIDest -Anchor @("DisplayName") -path $path
+    Write-Host "16%"
     Compare-Objects -ObjsSource $navSrc -ObjsDestination $navDest -Anchor @("DisplayName") -path $path
-    Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest
+    Write-Host "32%"
+    Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order") -path $path
+    Write-Host "50%"
     Compare-Objects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName") -path $path
+    Write-Host "67%"
     Compare-Objects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName") -path $path
+    Write-Host "83%"
     if ($confSrc -and $confDest) {
         Compare-MimObjects -ObjsSource $confSrc -ObjsDestination $confDest -Anchor @("DisplayName") -path $path # Can be empty
     }
@@ -284,8 +326,14 @@ Function Get-ObjectsFromConfig {
     # This looks for objectTypes and expects objects with the type ObjectType
     $objects = Search-Resources -Xpath "/$ObjectType" -ExpectedObjectType $ObjectType
     # Makes target a json and then converts it to an object
-    $updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
-    $object = ConvertFrom-Json -InputObject $updatedObjs
+    #$updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
+    #$object = ConvertFrom-Json -InputObject $updatedObjs
+    if ($objects) {
+        Convert-ToJson -Objects $objects -JsonName Temp
+        $objects = ConvertFrom-Json "ConfigTemp.json"
+    } else {
+        Write-Host "No objects found to write to json"
+    }
     return $object
 }
 
@@ -336,27 +384,54 @@ Function Compare-Objects {
         [String]
         $path
     )
+    $i = 1
+    $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
+        Write-Host "Comparing ($i/$total)"
+        $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
         } elseif ($Anchor.Count -eq 2) { # When ObjectType is BindingDescription or needs two anchors to find one object
-            $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
-            $_.($Anchor[1]) -like $obj.($Anchor[1])}
+            if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+                $RefToAttrSrc = $Global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
+                $RefToAttrDest = $Global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
+
+                $RefToObjSrc = $Global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
+                $RefToObjDest = $Global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
+
+                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
+                $_.BoundObjectType -like $RefToObjDest.ObjectID}
+            } else {
+                $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
+                $_.($Anchor[1]) -like $obj.($Anchor[1])}
+            }
         } else {    # When ObjectType needs multiple anchors to find unique object
-            $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
-            $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+            if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+                $RefToAttrSrc = $Global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
+                $RefToAttrDest = $Global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
+
+                $RefToObjSrc = $Global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Name}
+                $RefToObjDest = $Global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
+
+                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
+                $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+            } else {
+                $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
+                $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+            }
         }
         if (!$obj2) {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
-            # remove ObjectID's in case they are different
-            #$ReferenceObject = $False
-            $objObjectID = $obj.psobject.members.Value.ObjectID # ?
-            $obj.psobject.properties.Remove("ObjectID")
-            $obj2.psobject.properties.Remove("ObjectID")
+            $obj.ObjectID = $obj2.ObjectID
+
+            if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+                $obj.BoundAttributeType = $obj2.BoundAttributeType
+                $obj.BoundObjectType = $obj2.BoundObjectType
+            }
             
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
             if ($compResult) {
