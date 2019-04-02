@@ -228,7 +228,6 @@ Function Compare-Portal {
     if ($configSrc -and $configDest) {
         Compare-MimObjects -ObjsSource $configSrc -ObjsDestination $configDest -Anchor @("DisplayName") -path $path # Can be empty
     }
-    
     Write-Host "Compare of Portal configuration completed."
 }
 
@@ -294,7 +293,6 @@ function Get-ObjectsFromConfig {
     )
     $objects = Search-Resources -XPath "/$ObjectType" -ExpectedObjectType $ObjectType
     # converts return of Search-Resources to clixml format
-    # Compare had troubles because of different types after serialize
     # Source and Destination MIM-Setup get compared with objects that both have been serialized and deserialized
     if ($objects) {
         Write-ToCliXml -Objects $objects -xmlName Temp   
@@ -360,7 +358,7 @@ Function Compare-MimObjects {
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 # Find the corresponding object that matches the BoundAttributeType ID
                 $RefToAttrSrc = $global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
-                # Find the corresponding object that matches the source binding attribute with the destination attibute by Name
+                # Find the corresponding object that matches the source binded attribute with the destination attibute by Name
                 $RefToAttrDest = $global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
 
                 $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
@@ -385,7 +383,7 @@ Function Compare-MimObjects {
                 $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
             } else {
                 $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and 
-                $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+                $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -like $obj.($Anchor[2])}
             }
         }
         # If there is no match between the objects from different sources, the not found object will be added for import
@@ -394,7 +392,7 @@ Function Compare-MimObjects {
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
-            # Give object the object id from the target object => comparing reasons
+            # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID     
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
@@ -402,19 +400,15 @@ Function Compare-MimObjects {
             }
             
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
+            # If difference found
             if ($compResult) {
                 # To visually compare the differences yourself
                 #Write-Host $obj -BackgroundColor Green -ForegroundColor Black
                 #Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
                 $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
-                $compObj = $compObj | Where-Object membertype -like 'noteproperty'
-                $newObj = [PsCustomObject] @{}
-                foreach($prop in $compObj){
-                    $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
-                }
                 Write-host "Different object properties found:"
-                Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
-                $difference.Add($newObj)
+                Write-host $compObj -ForegroundColor Yellow -BackgroundColor Black
+                $difference.Add($compObj)
             }
         }
     }
@@ -460,7 +454,7 @@ Function Write-ToXmlFile {
     $node = $XmlDoc.SelectSingleNode('//Operations')
 
     # Place objects in XML file
-    # Iterate over the array of arrays of PsCustomObjects
+    # Iterate over the array of PsCustomObjects
     foreach ($obj in $DifferenceObjects) {
         # Operation description
         $xmlElement = $XmlDoc.CreateElement("ResourceOperation")
@@ -470,20 +464,11 @@ Function Write-ToXmlFile {
         # Anchor description
         $xmlElement = $XmlDoc.CreateElement("AnchorAttributes")
         $XmlAnchors = $XmlOperation.AppendChild($xmlElement)
-        # Different anchors for Bindings (referentials)
-        if ($obj.ObjectType -eq "BindingDescription") {
-            $xmlElement1 = $XmlDoc.CreateElement("AnchorAttribute")
-            $xmlElement1.Set_InnerText("BoundAttributeType")
-            $xmlElement2 = $XmlDoc.CreateElement("AnchorAttribute")
-            $xmlElement2.Set_InnerText("BoundObjectType")
-            $XmlAnchors.AppendChild($xmlElement1)
-            $XmlAnchors.AppendChild($xmlElement2)
-        } else {
-            foreach($anch in $Anchor){
-                $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
-                $xmlElement.Set_InnerText($anch)
-                $XmlAnchors.AppendChild($xmlElement)
-            }
+        # Different anchors for Bindings (or referentials)
+        foreach($anch in $Anchor){
+            $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
+            $xmlElement.Set_InnerText($anch)
+            $XmlAnchors.AppendChild($xmlElement)
         }
         # Attributes of the object
         $xmlEle = $XmlDoc.CreateElement("AttributeOperations")
@@ -492,6 +477,12 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
+            # Attributes that are read only do not get implemented in the xml file
+            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+             "ExpectedRulesList", "ResourceTime", "ComputedMember")
+            # Skip read only attributes and ObjectType (already used in ResourceOperation)
+            if ($illegalMembers -contains $member.Name) { continue }
+            # insert ArrayList values into the configuration
             if($member.Value){
                 if ($member.Value.GetType().BaseType.Name -eq "ArrayList") { 
                     foreach ($m in $member.Value) {
@@ -504,11 +495,6 @@ Function Write-ToXmlFile {
                     continue
                 }
             }
-            # Attributes that are read only do not get implemented in the xml file
-            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
-             "ExpectedRulesList", "ResourceTime", "ComputedMember")
-            # Skip read only attributes and ObjectType (already used in ResourceOperation)
-            if ($illegalMembers -contains $member.Name) { continue }
             # referencing purposes, no need in the attributes itself (Lithnet does this)
             if ($member.Name -eq "ObjectID") {
                 # set the objectID of the object as the id of the xml node
@@ -518,7 +504,7 @@ Function Write-ToXmlFile {
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
             $xmlVarElement.Set_InnerText($member.Value)
             $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-            $xmlVariable.SetAttribute("operation", "replace") #Add of replace?
+            $xmlVariable.SetAttribute("operation", "replace")
             $xmlVariable.SetAttribute("name", $member.Name)
             if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
                 $xmlVariable.SetAttribute("type", "xmlref")
@@ -574,7 +560,6 @@ Function Import-Delta {
         [string]
         $DeltaConfigFilePath
     )
-        # Preview parameter to check what will get imported.
         # When Preview is enabled this will not import the configuration but give a preview
         Import-RMConfig $DeltaConfigFilePath -Verbose #-Preview
 }
