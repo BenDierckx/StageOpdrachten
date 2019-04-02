@@ -502,8 +502,14 @@ Function Write-ToXmlFile {
         # Anchor description
         $xmlElement = $XmlDoc.CreateElement("AnchorAttributes")
         $XmlAnchors = $XmlOperation.AppendChild($xmlElement)
+
+        foreach($anch in $Anchor) {
+            $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
+            $xmlElement.Set_InnerText($anch)
+            $XmlAnchors.AppendChild($xmlElement)
+        }
             # Different anchors for Bindings (referentials)
-        if ($obj.ObjectType -eq "BindingDescription") {
+        <#if ($obj.ObjectType -eq "BindingDescription") {
             $xmlElement1 = $XmlDoc.CreateElement("AnchorAttribute")
             $xmlElement1.Set_InnerText("BoundAttributeType")
             $xmlElement2 = $XmlDoc.CreateElement("AnchorAttribute")
@@ -516,7 +522,7 @@ Function Write-ToXmlFile {
                 $xmlElement.Set_InnerText($anch)
                 $XmlAnchors.AppendChild($xmlElement)
             }
-        }
+        }#>
         # Attributes of the object
         $xmlEle = $XmlDoc.CreateElement("AttributeOperations")
         $XmlAttributes = $XmlOperation.AppendChild($xmlEle)
