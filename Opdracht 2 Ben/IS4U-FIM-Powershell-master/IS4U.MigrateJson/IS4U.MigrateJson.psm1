@@ -347,8 +347,12 @@ Function Get-ObjectsFromJson {
         $JsonFilePath
     )
 
-    $objs = Get-Content $JsonFilePath | ConvertFrom-Json
-    return $objs
+    try {
+        $objs = Get-Content $JsonFilePath | ConvertFrom-Json
+        return $objs
+    } catch {
+        Write-Host "File not found $JsonFilePath" -ForegroundColor Red
+    }
 }
 
 Function Compare-Objects {
@@ -374,7 +378,7 @@ Function Compare-Objects {
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
-        Write-Host "`rComparing $i/$total... " -NoNewline
+        Write-Host "`rComparing $i/$total... `t" -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}

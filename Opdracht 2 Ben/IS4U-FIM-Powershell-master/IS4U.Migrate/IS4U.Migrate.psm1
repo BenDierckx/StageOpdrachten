@@ -323,8 +323,12 @@ Function Get-ObjectsFromXml {
         [String]
         $xmlFilePath
     )
-    $objs = Import-Clixml -Path $xmlFilePath
-    return $objs
+    try{
+        $objs = Import-Clixml -Path $xmlFilePath
+        return $objs
+    } catch {
+        Write-Host "File not found $xmlFilePath" -ForegroundColor Red
+    }
 }
 
 Function Compare-MimObjects {
@@ -350,7 +354,7 @@ Function Compare-MimObjects {
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
-        Write-Host "`rComparing $i/$total... " -NoNewline
+        Write-Host "`rComparing $i/$total... `t" -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
