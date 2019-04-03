@@ -312,8 +312,16 @@ Function Get-ObjectsFromConfig {
     )
     # This looks for objectTypes and expects objects with the type ObjectType
     $objects = Search-Resources -Xpath "/$ObjectType" -ExpectedObjectType $ObjectType
+    # Read only members, not needed for import (are generated in the MIM-Setup)
+    $illegalMembers = @("CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+    "ExpectedRulesList", "ResourceTime", "ComputedMember")
     # Makes target a json and then converts it to an object
     if ($objects) {
+        foreach($obj in $objects){
+            foreach($illMem in $illegalMembers){
+                $obj.psobject.properties.Remove("$illMem")
+            }
+        }
         $updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
         $object = ConvertFrom-Json -InputObject $updatedObjs
     } else {
@@ -482,9 +490,9 @@ Function Write-ToXmlFile {
         $initalElement = $Doc.CreateElement("Lithnet.ResourceManagement.ConfigSync")
         $operationsElement = $Doc.CreateElement("Operations")
         $declaration = $Doc.CreateXmlDeclaration("1.0","UTF-8",$null)
-        $Doc.AppendChild($declaration)
+        $Doc.AppendChild($declaration) | Out-Null
         $startNode = $Doc.AppendChild($initalElement)
-        $startNode.AppendChild($operationsElement)
+        $startNode.AppendChild($operationsElement) | Out-Null
         $Doc.Save($FileName)
     }
     if (!(Test-Path -Path $FileName)) {
@@ -518,11 +526,8 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
-            # Attributes that are read only do not get implemented in the xml file
-            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
-             "ExpectedRulesList", "ResourceTime", "ComputedMember")
             # Skip read only attributes and ObjectType (already used in ResourceOperation)
-            if ($illegalMembers -contains $member.Name) { continue }
+            if ($member.Name -eq "ObjectType") { continue }
             # insert ArrayList values into the configuration
             if($member.Value){
                 if ($member.Value.GetType().BaseType.Name -eq "ArrayList") { 

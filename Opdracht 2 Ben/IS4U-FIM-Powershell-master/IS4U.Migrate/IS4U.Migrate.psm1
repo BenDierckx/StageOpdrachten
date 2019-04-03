@@ -34,7 +34,7 @@ Function Start-Migration {
     .DESCRIPTION
     If SourceOfMIMSetup is set to True, this function will call the function to get the resources and converts them to CliXml.
     This will be placed in xml files and these are used when SourceOfMIMSetup is False.
-    To import the resources, call Start-Migration from this folder. It will serialze the target MIM setup resources to clixml and
+    To import the resources, call Start-Migration from this folder. It will serialize the target MIM setup resources to clixml and
     deserialize them so they can be compared. After that the different object(s) (new or different properties) will be written to
     a delta configuration xml file. This Lithnet format xml file then gets imported in the target MIM Setup.  
     
@@ -292,9 +292,17 @@ function Get-ObjectsFromConfig {
         $ObjectType
     )
     $objects = Search-Resources -XPath "/$ObjectType" -ExpectedObjectType $ObjectType
+    # Read only members, not needed for import (are generated in the MIM-Setup)
+    $illegalMembers = @("CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+    "ExpectedRulesList", "ResourceTime", "ComputedMember")
     # converts return of Search-Resources to clixml format
     # Source and Destination MIM-Setup get compared with objects that both have been serialized and deserialized
     if ($objects) {
+        foreach($obj in $objects){
+            foreach($illMem in $illegalMembers){
+                $obj.psobject.properties.Remove("$illMem")
+            }
+        }
         Write-ToCliXml -Objects $objects -xmlName Temp   
         $objects = Import-Clixml "ConfigTemp.xml"
     } else {
@@ -353,8 +361,8 @@ Function Compare-MimObjects {
     $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
-        #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
-        Write-Host "`rComparing $i/$total... `t" -NoNewline
+        #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total objects" -PercentComplete ($i/$total*100)
+        Write-Host "`rComparing $i/$total...`t" -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
@@ -391,23 +399,12 @@ Function Compare-MimObjects {
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -like $obj.($Anchor[2])}
             }
         }
-        # These members are different in every environment, remove them before add or compare
-        $illegalMembers = @("CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
-             "ExpectedRulesList", "ResourceTime", "ComputedMember")
         # If there is no match between the objects from different sources, the not found object will be added for import
         if (!$obj2) {
-            foreach($illMemb in $illegalMembers) {
-                $obj.psobject.properties.remove("$illMemb")
-                $obj2.psobject.properties.Remove("$illMemb")
-            }
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
-            foreach($illMemb in $illegalMembers) {
-                $obj.psobject.properties.remove("$illMemb")
-                $obj2.psobject.properties.Remove("$illMemb")
-            }
             # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID     
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
@@ -457,9 +454,9 @@ Function Write-ToXmlFile {
         $initalElement = $Doc.CreateElement("Lithnet.ResourceManagement.ConfigSync")
         $operationsElement = $Doc.CreateElement("Operations")
         $declaration = $Doc.CreateXmlDeclaration("1.0","UTF-8",$null)
-        $Doc.AppendChild($declaration)
+        $Doc.AppendChild($declaration) | Out-Null
         $startNode = $Doc.AppendChild($initalElement)
-        $startNode.AppendChild($operationsElement)
+        $startNode.AppendChild($operationsElement) | Out-Null
         $Doc.Save($FileName)
     }
     if (!(Test-Path -Path $FileName)) {
@@ -493,11 +490,8 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
-            # Attributes that are read only do not get implemented in the xml file
-            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
-             "ExpectedRulesList", "ResourceTime", "ComputedMember")
-            # Skip read only attributes and ObjectType (already used in ResourceOperation)
-            if ($illegalMembers -contains $member.Name) { continue }
+            # Skip ObjectType (already used in ResourceOperation)
+            if ($member.Name -eq "ObjectType") { continue }
             # insert ArrayList values into the configuration
             if($member.Value){
                 if ($member.Value.GetType().BaseType.Name -eq "ArrayList") { 
