@@ -23,8 +23,37 @@ if(!(Get-Module -Name LithnetRMA)) {
 #endregion Lithnet
 
 Function Start-MigrationJson {
+    <#
+    .SYNOPSIS
+    Starts the migration by either getting the source MIM setup or importing this setup in a MIM setup.
+    
+    .DESCRIPTION
+    If SourceOfMIMSetup is set to True, this function will call the function to get the resources and converts them to json.
+    This will be placed in json files and these are used when SourceOfMIMSetup is False.
+    To import the resources, call Start-MigrationJson from this folder. It will serialize the target MIM setup resources to json and
+    deserialize them so they can be compared. After that the different object(s) (new or different properties) will be written to
+    a delta configuration xml file. This Lithnet format xml file then gets imported in the target MIM Setup.  
+    
+    .PARAMETER SourceOfMIMSetup
+    If True will get the json files from the source MIM environment.
+    If False will import the resources in the generated json files.
+
+    .PARAMETER ImportSchema
+    This parameter has the same concept as ImportPolicy and ImportPortal
+    When True, ImportAllConfigurations will be set to false, this will cause to only import the
+    imports that are set to True
+    
+    .EXAMPLE
+    Start-MigrationJson -SourceOfMIMSetup $True
+    Start-MigrationJson
+    Start-MigrationJson -ImportSchema $True
+
+    .Notes
+    IMPORTANT:
+    This module has been designed to only use the Start-MigrationJson function. When other function are called there is no
+    guarantee the desired effect will be accomplished.
+    #>
     param(
-        # Source?
         [Parameter(Mandatory=$False)]
         [Bool]
         $SourceOfMIMSetup = $False,
@@ -46,6 +75,8 @@ Function Start-MigrationJson {
         $ImportPortal = $False
     )
 
+    $ImportAllConfigurations = $True
+    # ReferentialList to store Objects and Attributes in memory for reference of bindings
     $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
     SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
 
@@ -93,13 +124,11 @@ Function Get-SchemaConfigToJson {
     $objs = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     $binds = Get-ObjectsFromConfig -ObjectType BindingDescription
     $constSpec = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
-    #$schemaSup = Get-ObjectsFromConfig -ObjectType SchemaSupportedLocales
 
     Convert-ToJson -Objects $attrs -JsonName Attributes
     Convert-ToJson -Objects $objs -JsonName objectTypes
     Convert-ToJson -Objects $binds -JsonName Bindings
     Convert-ToJson -Objects $constSpec -JsonName ConstantSpecifiers
-    #Convert-ToJson -Objects $schemaSup -JsonName SchemaSupportedLocales
 }
 
 Function Compare-SchemaJson {
@@ -120,15 +149,8 @@ Function Compare-SchemaJson {
     }
     $bindingsSource = Get-ObjectsFromJson -JsonFilePath "ConfigBindings.json"
     $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstSpecifiers.json"
-    #$schemaSupsSource = Get-ObjectsFromJson -JsonFilePath "SchemaSupportedLocales.json"
     
     # Target Setup objects, comparing purposes
-    #$attrsDest = Search-Resources -XPath "/AttributeTypeDescription" -ExpectedObjectType AttributeTypeDescription
-    #$objsDest = Search-Resources -XPath "/ObjectTypeDescription" -ExpectedObjectType ObjectTypeDescription
-    #$bindingsDest = Search-Resources -XPath "/BindingDescription" -ExpectedObjectType BindingDescription
-    #$constSpecsDest = Search-Resources -XPath "/ConstantSpecifier" -ExpectedObjectType ConstantSpecifier
-    #$schemaSupsDest = Search-Resources -XPath "/SchemaSupportedLocales" -ExpectedObjectType SchemaSupportedLocales
-
     # Makes target a json and then converts it to an object
     $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
     foreach($obj in $attrsDest) {
@@ -150,7 +172,6 @@ Function Compare-SchemaJson {
     Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType") -path $path
     Write-Host "75%"
     Compare-Objects -ObjsSource $constSpecsSource -ObjsDestination $constSpecsDest -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey") -path $path
-    #Compare-Objects -ObjsSource $schemaSupsSource -ObjsDestination $schemaSupsDest
     Write-Host "Compare of Schema configuration completed."
 }
 
@@ -203,16 +224,6 @@ Function Compare-PolicyJson {
     $syncFSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSyncFilters.json"
 
     # Target Setup objects, comparing purposes
-    <#$mgmntPlciesDest = Search-Resources -XPath "/ManagementPolicyRule" -ExpectedObjectType ManagementPolicyRule
-    $setsDest = Search-Resources -XPath "/Set" -ExpectedObjectType Set
-    $workflowDest = Search-Resources -XPath "/WorkflowDefinition" -ExpectedObjectType WorkflowDefinition
-    $emailDest = Search-Resources -XPath "/EmailTemplate" -ExpectedObjectType EmailTemplate
-    $filtersDest = Search-Resources -XPath "/FilterScope" -ExpectedObjectType FilterScope
-    $activityDest = Search-Resources -XPath "/ActivityInformationConfiguration" -ExpectedObjectType ActivityInformationConfiguration
-    $funcDest = Search-Resources -XPath "/Function" -ExpectedObjectType Function 
-    $syncRDest = Search-Resources -XPath "/SynchronizationRule" -ExpectedObjectType SynchronizationRule
-    $syncFDest = Search-Resources -XPath "/SynchronizationFilter" -ExpectedObjectType SynchronizationFilter#>
-
     $mgmntPlciesDest = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
     $setsDest = Get-ObjectsFromConfig -ObjectType Set
     $workflowDest = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
@@ -287,12 +298,6 @@ Function Compare-PortalJson {
     $confSrc = Get-ObjectsFromJson -JsonFilePath "ConfigConfigurations"
 
     # Target Setup objects, comparing purposes
-    <#$UIDest = Search-Resources -XPath "/PortalUIConfiguration" -ExpectedObjectType PortalUIConfiguration
-    $navDest = Search-Resources -XPath "/NavigationBarConfiguration" -ExpectedObjectType NavigationBarConfiguration
-    $srchScopeDest = Search-Resources -XPath "/SearchScopeConfiguration" -ExpectedObjectType SearchScopeConfiguration
-    $objVisDest = Search-Resources -XPath "/ObjectVisualizationConfiguration" -ExpectedObjectType ObjectVisualizationConfiguration
-    $homePDest = Search-Resources -XPath "/HomepageConfiguration" -ExpectedObjectType HomepageConfiguration#>
-
     $UIDest = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
     $navDest = Get-ObjectsFromConfig -ObjectType NavigationBarConfiguration
     $srchScopeDest = Get-ObjectsFromConfig -ObjectType SearchScopeConfiguration
@@ -391,21 +396,26 @@ Function Compare-Objects {
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
-        } elseif ($Anchor.Count -eq 2) { # When ObjectType is BindingDescription or needs two anchors to find one object
-            if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+        } elseif ($Anchor.Count -eq 2) { 
+            # When ObjectType is BindingDescription or needs two anchors to find one object
+            if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") { 
+                # Find the corresponding object that matches the BoundAttributeType ID
                 $RefToAttrSrc = $Global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
+                # Find the corresponding object that matches the source binded attribute with the destination attibute by Name
                 $RefToAttrDest = $Global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
 
                 $RefToObjSrc = $Global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
                 $RefToObjDest = $Global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
 
+                #obj2 gets the correct object that corresponds to the source object
                 $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
                 $_.BoundObjectType -like $RefToObjDest.ObjectID}
             } else {
                 $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
                 $_.($Anchor[1]) -like $obj.($Anchor[1])}
             }
-        } else {    # When ObjectType needs multiple anchors to find unique object
+        } else { 
+            # When ObjectType needs multiple anchors to find unique object
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 $RefToAttrSrc = $Global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
                 $RefToAttrDest = $Global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
@@ -420,33 +430,29 @@ Function Compare-Objects {
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
             }
         }
+        # If there is no match between the objects from different sources, the not found object will be added for import
         if (!$obj2) {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
+            # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID
-
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
                 $obj.BoundObjectType = $obj2.BoundObjectType
             }
             
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
+            # If difference found
             if ($compResult) {
-                Write-Host $obj -BackgroundColor Green -ForegroundColor Black
-                Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
+                # To visually compare the differences yourself
+                #Write-Host $obj -BackgroundColor Green -ForegroundColor Black
+                #Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
                 $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
-                $compObj = $compObj | Where-Object membertype -like 'noteproperty'
-                $newObj = [PsCustomObject] @{}
-                foreach($prop in $compObj){
-                    $newobj | Add-Member -NotePropertyName $prop.Name -NotePropertyValue $prop.Value
-                }
                 Write-host "Different object properties found:"
                 Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
-                # Give ObjectID back to the object difference
-                $newObj | Add-Member -NotePropertyName "ObjectID" -NotePropertyValue $objObjectID 
-                $difference.Add($newObj)
+                $difference.Add($compObj)
             }
         }
     }
@@ -463,13 +469,13 @@ Function Write-ToXmlFile {
         [System.Collections.ArrayList]
         $DifferenceObjects,
 
-        [Parameter(Mandatory=$False)]
-        [Array]
-        $Anchor,
-
         [Parameter(Mandatory = $True)]
         [String]
-        $path
+        $path,
+
+        [Parameter(Mandatory=$True)]
+        [Array]
+        $Anchor
     )
     # Inititalization xml file
     $FileName = "$path/configurationDelta.xml"
@@ -492,7 +498,7 @@ Function Write-ToXmlFile {
     $node = $XmlDoc.SelectSingleNode('//Operations')
 
     # Place objects in XML file
-    # Iterate over the array of arrays of PsCustomObjects
+    # Iterate over the array of PsCustomObjects
     foreach ($obj in $DifferenceObjects) {
         # Operation description
         $xmlElement = $XmlDoc.CreateElement("ResourceOperation")
@@ -502,27 +508,12 @@ Function Write-ToXmlFile {
         # Anchor description
         $xmlElement = $XmlDoc.CreateElement("AnchorAttributes")
         $XmlAnchors = $XmlOperation.AppendChild($xmlElement)
-
-        foreach($anch in $Anchor) {
+        # Different anchors for Bindings (or referentials)
+        foreach($anch in $Anchor){
             $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
             $xmlElement.Set_InnerText($anch)
             $XmlAnchors.AppendChild($xmlElement)
         }
-            # Different anchors for Bindings (referentials)
-        <#if ($obj.ObjectType -eq "BindingDescription") {
-            $xmlElement1 = $XmlDoc.CreateElement("AnchorAttribute")
-            $xmlElement1.Set_InnerText("BoundAttributeType")
-            $xmlElement2 = $XmlDoc.CreateElement("AnchorAttribute")
-            $xmlElement2.Set_InnerText("BoundObjectType")
-            $XmlAnchors.AppendChild($xmlElement1)
-            $XmlAnchors.AppendChild($xmlElement2)
-        } else {
-            foreach($anch in $Anchor) {
-                $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
-                $xmlElement.Set_InnerText($anch)
-                $XmlAnchors.AppendChild($xmlElement)
-            }
-        }#>
         # Attributes of the object
         $xmlEle = $XmlDoc.CreateElement("AttributeOperations")
         $XmlAttributes = $XmlOperation.AppendChild($xmlEle)
@@ -530,22 +521,24 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
+            # Attributes that are read only do not get implemented in the xml file
+            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+             "ExpectedRulesList", "ResourceTime", "ComputedMember")
+            # Skip read only attributes and ObjectType (already used in ResourceOperation)
+            if ($illegalMembers -contains $member.Name) { continue }
+            # insert ArrayList values into the configuration
             if($member.Value){
-                if ($member.Value.GetType().BaseType.Name -eq "Array") {  ## aangepast, beziet altijd of het array is of niet
+                if ($member.Value.GetType().BaseType.Name -eq "ArrayList") { 
                     foreach ($m in $member.Value) {
                         $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
                         $xmlVarElement.Set_InnerText($m)
                         $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                        $xmlVariable.SetAttribute("operation", "add") # add because we don't want to replace the items 
+                        $xmlVariable.SetAttribute("operation", "add")
                         $xmlVariable.SetAttribute("name", $member.Name)
                     }
+                    continue
                 }
             }
-            # Attributes that are read only do not get implemented in the xml file
-            $illegalMembers = @("ObjectType", "CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
-             "ExpectedRulesList", "ResourceTime")
-            # Skip read only attributes and ObjectType (already used in ResourceOperation)
-            if ($illegalMembers -contains $member.Name) { continue }
             # referencing purposes, no need in the attributes itself (Lithnet does this)
             if ($member.Name -eq "ObjectID") {
                 # set the objectID of the object as the id of the xml node
@@ -555,7 +548,7 @@ Function Write-ToXmlFile {
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
             $xmlVarElement.Set_InnerText($member.Value)
             $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-            $xmlVariable.SetAttribute("operation", "replace") #Add of replace?
+            $xmlVariable.SetAttribute("operation", "replace")
             $xmlVariable.SetAttribute("name", $member.Name)
             if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
                 $xmlVariable.SetAttribute("type", "xmlref")
@@ -563,18 +556,23 @@ Function Write-ToXmlFile {
         }
     }
     # Save the xml 
-    $XmlDoc.Save($FileName) #path nog na te zien!!!!!!!!!!!
+    $XmlDoc.Save($FileName)
     # Confirmation
-    Write-Host "Written differences in objects to the delta xml file (ConfiurationDelta.xml)"
-    # Return the new xml 
-    #[xml]$result = $XmlDoc | Select-Xml -XPath "//ResourceOperation[@resourceType='$ObjectType']"
-    #[xml]$result = [System.Xml.XmlDocument] (Get-Content ".\$ObjectType.xml")
-    #return $result
+    Write-Host "Written differences in objects to the delta xml file (ConfigurationDelta.xml)"
 }
 
-# Voor zelf folder te laten selecteren?
-# bron: https://stackoverflow.com/questions/11412617/get-a-folder-path-from-the-explorer-menu-to-a-powershell-variable
 Function Select-FolderDialog{
+    <#
+    .SYNOPSIS
+    Prompts the user for a folder browser.
+    
+    .DESCRIPTION
+    This function makes the user choose a destination folder to save the xml configuration delta.
+    If The user aborts this, the script will stop executing.
+    
+    .LINK
+    https://stackoverflow.com/questions/11412617/get-a-folder-path-from-the-explorer-menu-to-a-powershell-variable
+    #>
     [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null     
 
     $objForm = New-Object System.Windows.Forms.FolderBrowserDialog
