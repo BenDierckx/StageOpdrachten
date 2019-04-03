@@ -526,7 +526,7 @@ Function Write-ToXmlFile {
         $objMembers = $obj.psobject.Members | Where-Object membertype -like 'noteproperty'
         # iterate over the PsCustomObject members and append them to the AttributeOperations element
         foreach ($member in $objMembers) {
-            # Skip read only attributes and ObjectType (already used in ResourceOperation)
+            # Skip ObjectType (already used in ResourceOperation)
             if ($member.Name -eq "ObjectType") { continue }
             # insert ArrayList values into the configuration
             if($member.Value){
