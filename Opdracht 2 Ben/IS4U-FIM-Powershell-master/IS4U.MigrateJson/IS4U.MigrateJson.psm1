@@ -141,11 +141,11 @@ Function Compare-SchemaJson {
     # Source of objects to be imported
     $attrsSource = Get-ObjectsFromJson -JsonFilePath "ConfigAttributes.json"
     foreach($obj in $attrsSource) {
-        $Global:ReferentialList.SourceRefAttrs.Add($obj)
+        $Global:ReferentialList.SourceRefAttrs.Add($obj) | Out-Null
     }
     $objsSource = Get-ObjectsFromJson -JsonFilePath "ConfigObjectTypes.json"
     foreach($obj in $objsSource) {
-        $Global:ReferentialList.SourceRefObjs.Add($obj)
+        $Global:ReferentialList.SourceRefObjs.Add($obj) | Out-Null
     }
     $bindingsSource = Get-ObjectsFromJson -JsonFilePath "ConfigBindings.json"
     $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstSpecifiers.json"
@@ -154,23 +154,19 @@ Function Compare-SchemaJson {
     # Makes target a json and then converts it to an object
     $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
     foreach($obj in $attrsDest) {
-        $Global:ReferentialList.DestRefAttrs.Add($obj)
+        $Global:ReferentialList.DestRefAttrs.Add($obj) | Out-Null
     }
     $objsDest = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     foreach($obj in $objsDest) {
-        $Global:ReferentialList.DestRefObjs.Add($obj)
+        $Global:ReferentialList.DestRefObjs.Add($obj) | Out-Null
     }
     $bindingsDest = Get-ObjectsFromConfig -ObjectType BindingDescription
     $constSpecsDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
 
     # Comparing of the Source and Target Setup to create delta xml file
-    Write-Host "0%"
     Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest -path $path
-    Write-Host "25%"
     Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest -path $path
-    Write-Host "50%"
     Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType") -path $path
-    Write-Host "75%"
     Compare-Objects -ObjsSource $constSpecsSource -ObjsDestination $constSpecsDest -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey") -path $path
     Write-Host "Compare of Schema configuration completed."
 }
@@ -235,24 +231,15 @@ Function Compare-PolicyJson {
     $syncFDest = Get-ObjectsFromConfig -ObjectType SynchronizationFilter
 
     # Comparing of the Source and Target Setup to create delta xml file
-    Write-Host "0%"
     Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName") -path $path
-    Write-Host "11%"
     Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
-    Write-Host "22%"
     Compare-Objects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName") -path $path
-    Write-Host "33%"
     Compare-Objects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName") -path $path
-    Write-Host "44%"
     Compare-Objects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName") -path $path
-    Write-Host "55%"
     Compare-Objects -ObjsSource $activitySrc -ObjsDestination $activityDest -Anchor @("DisplayName") -path $path
-    Write-Host "66%"
     Compare-Objects -ObjsSource $funcSrc -ObjsDestination $funcDest -Anchor @("DisplayName") -path $path
-    Write-Host "77%"
     if ($syncRSrc) {
         Compare-Objects -ObjsSource $syncRSrc -ObjsDestination $syncRDest -Anchor @("DisplayName") -path $path
-        Write-Host "88%"
     }
     Compare-Objects -ObjsSource $syncFSrc -ObjsDestination $syncFDest -Anchor @("DisplayName") -path $path
     Write-Host "Compare of Policy configuration completed."
@@ -306,17 +293,11 @@ Function Compare-PortalJson {
     $confDest = Get-ObjectsFromConfig -ObjectType Configuration
 
     # Comparing of the Source and Target Setup to create delta xml file
-    Write-Host "0%..."
     Compare-Objects -ObjsSource $UISrc -ObjsDestination $UIDest -Anchor @("DisplayName") -path $path
-    Write-Host "16%"
     Compare-Objects -ObjsSource $navSrc -ObjsDestination $navDest -Anchor @("DisplayName") -path $path
-    Write-Host "32%"
     Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order") -path $path
-    Write-Host "50%"
     Compare-Objects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName") -path $path
-    Write-Host "67%"
     Compare-Objects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName") -path $path
-    Write-Host "83%"
     if ($confSrc -and $confDest) {
         Compare-MimObjects -ObjsSource $confSrc -ObjsDestination $confDest -Anchor @("DisplayName") -path $path # Can be empty
     }
@@ -392,7 +373,8 @@ Function Compare-Objects {
     $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
-        Write-Host "Comparing ($i/$total)"
+        #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
+        Write-Host "`rComparing $i/$total... " -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}

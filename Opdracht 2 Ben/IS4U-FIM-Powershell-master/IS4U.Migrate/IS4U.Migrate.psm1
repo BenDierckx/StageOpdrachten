@@ -121,11 +121,11 @@ Function Compare-Schema {
     # Source of objects to be imported
     $attrsSource = Get-ObjectsFromXml -XmlFilePath "ConfigAttributes.xml"
     foreach($objt in $attrsSource) {
-        $global:ReferentialList.SourceRefAttrs.Add($objt)
+        $global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
     }
     $objsSource = Get-ObjectsFromXml -XmlFilePath "ConfigObjectTypes.xml"
     foreach($objt in $objsSource) {
-        $global:ReferentialList.SourceRefObjs.Add($objt)
+        $global:ReferentialList.SourceRefObjs.Add($objt) | Out-Null
     }
     $bindingsSource = Get-ObjectsFromXml -XmlFilePath "ConfigBindings.xml"
     $cstspecifiersSource = Get-ObjectsFromXml -XmlFilePath "ConfigConstSpecifiers.xml"
@@ -133,11 +133,11 @@ Function Compare-Schema {
     # Target Setup objects
     $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
     foreach($objt in $attrsDest) {
-        $global:ReferentialList.DestRefAttrs.Add($objt)
+        $global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
     }
     $objsDest = Get-ObjectsFromConfig -ObjectType ObjectTypeDescription
     foreach($objt in $objsDest) {
-        $global:ReferentialList.DestRefObjs.Add($objt)
+        $global:ReferentialList.DestRefObjs.Add($objt) | Out-Null
     }
     $bindingsDest = Get-ObjectsFromConfig -ObjectType BindingDescription
     $cstspecifiersDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
@@ -349,7 +349,8 @@ Function Compare-MimObjects {
     $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
-        Write-Host "Comparing ($i/$total)"
+        #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
+        Write-Host "`rComparing $i/$total... " -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
@@ -386,12 +387,23 @@ Function Compare-MimObjects {
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -like $obj.($Anchor[2])}
             }
         }
+        # These members are different in every environment, remove them before add or compare
+        $illegalMembers = @("CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+             "ExpectedRulesList", "ResourceTime", "ComputedMember")
         # If there is no match between the objects from different sources, the not found object will be added for import
         if (!$obj2) {
+            foreach($illMemb in $illegalMembers) {
+                $obj.psobject.properties.remove("$illMemb")
+                $obj2.psobject.properties.Remove("$illMemb")
+            }
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
+            foreach($illMemb in $illegalMembers) {
+                $obj.psobject.properties.remove("$illMemb")
+                $obj2.psobject.properties.Remove("$illMemb")
+            }
             # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID     
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
