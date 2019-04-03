@@ -430,12 +430,23 @@ Function Compare-Objects {
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
             }
         }
+        # These members are different in every environment, remove them before add or compare
+        $illegalMembers = @("CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
+             "ExpectedRulesList", "ResourceTime", "ComputedMember")
         # If there is no match between the objects from different sources, the not found object will be added for import
         if (!$obj2) {
+            foreach($illMemb in $illegalMembers) {
+                $obj.psobject.properties.remove("$illMemb")
+                $obj2.psobject.properties.Remove("$illMemb")
+            }
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
+            foreach($illMemb in $illegalMembers) {
+                $obj.psobject.properties.remove("$illMemb")
+                $obj2.psobject.properties.Remove("$illMemb")
+            }
             # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
