@@ -29,13 +29,17 @@ Import-Module LithnetRMA;
 Function Start-Migration {
     <#
     .SYNOPSIS
-    Starts the migration by either getting the source MIM setup or importing this setup in a MIM setup.
+    Starts the migration by either getting the source MIM setup or importing this setup in a different target MIM setup.
     
     .DESCRIPTION
-    If SourceOfMIMSetup is set to True, this function will call the function to get the resources and converts them to CliXml.
-    This will be placed in xml files and these are used when SourceOfMIMSetup is False.
+    Call Start-Migration from the IS4U.Migrate folder!
+    If the parameter SourceOfMIMSetup is set to True, Start-Migration will call the functions to
+    get the resources from the configuration and converts these resources to a CliXml format. 
+    The CliXml objects than get written to xml files for each object type.
+    The results in xml files are used when SourceOfMIMSetup is False.
     To import the resources, call Start-Migration from this folder. It will serialize the target MIM setup resources to clixml and
-    deserialize them so they can be compared. After that the different object(s) (new or different properties) will be written to
+    deserialize them so they can be compared with the resources from the source xml files. 
+    After that the different object(s) (new or different properties) will be written to
     a delta configuration xml file. This Lithnet format xml file then gets imported in the target MIM Setup.  
     
     .PARAMETER SourceOfMIMSetup
@@ -43,14 +47,14 @@ Function Start-Migration {
     If False will import the resources in the generated xml files.
 
     .PARAMETER ImportSchema
-    This parameter has the same concept as ImportPolicy and ImportPortal
+    This parameter is the same concept as ImportPolicy and ImportPortal:
     When True, ImportAllConfigurations will be set to false, this will cause to only import the
-    imports that are set to True
+    configurations where the parameters are set to True, in this case the Schema configuration.
     
     .EXAMPLE
     Start-Migration -SourceOfMIMSetup $True
     Start-Migration
-    Start-Migration -ImportSchema $True
+    Start-Migration -ImportPolicy $True
 
     .Notes
     IMPORTANT:
@@ -90,8 +94,8 @@ Function Start-Migration {
         }
         if ($ImportAllConfigurations) {
             Compare-Schema -path $path
-            Compare-Policy -path $path
             Compare-Portal -path $path
+            Compare-Policy -path $path
         } else {
             if ($ImportSchema) {
                 Compare-Schema -path $path
@@ -146,7 +150,8 @@ Function Compare-Schema {
     Write-Host "Starting compare of Schema configuration..."
     Compare-MimObjects -ObjsSource $attrsSource -ObjsDestination $attrsDest -path $path
     Compare-MimObjects -ObjsSource $objsSource -ObjsDestination $objsDest -path $path
-    Compare-MimObjects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType") -path $path
+    Compare-MimObjects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest `
+    -Anchor @("BoundAttributeType", "BoundObjectType") -path $path
     Compare-MimObjects -ObjsSource $cstspecifiersSource -ObjsDestination $cstspecifiersDest `
     -Anchor @("BoundAttributeType", "BoundObjectType", "ConstantValueKey") -path $path
     Write-Host "Compare of Schema configuration completed."
@@ -225,8 +230,9 @@ Function Compare-Portal {
     Compare-MimObjects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order") -path $path
     Compare-MimObjects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName") -path $path
     Compare-MimObjects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName") -path $path
+    # Could be empty
     if ($configSrc -and $configDest) {
-        Compare-MimObjects -ObjsSource $configSrc -ObjsDestination $configDest -Anchor @("DisplayName") -path $path # Can be empty
+        Compare-MimObjects -ObjsSource $configSrc -ObjsDestination $configDest -Anchor @("DisplayName") -path $path
     }
     Write-Host "Compare of Portal configuration completed."
 }
@@ -298,6 +304,7 @@ function Get-ObjectsFromConfig {
     # converts return of Search-Resources to clixml format
     # Source and Destination MIM-Setup get compared with objects that both have been serialized and deserialized
     if ($objects) {
+        # Remove read-only attributes
         foreach($obj in $objects){
             foreach($illMem in $illegalMembers){
                 $obj.psobject.properties.Remove("$illMem")
@@ -334,7 +341,7 @@ Function Get-ObjectsFromXml {
     try{
         $objs = Import-Clixml -Path $xmlFilePath
         return $objs
-    } catch {
+    } catch [System.Management.Automation.ItemNotFoundException] {
         Write-Host "File not found $xmlFilePath" -ForegroundColor Red
     }
 }
@@ -399,7 +406,7 @@ Function Compare-MimObjects {
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -like $obj.($Anchor[2])}
             }
         }
-        # If there is no match between the objects from different sources, the not found object will be added for import
+        # If there is no match between the objects from different sources the object will be added for import
         if (!$obj2) {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
@@ -505,11 +512,11 @@ Function Write-ToXmlFile {
                     continue
                 }
             }
-            # referencing purposes, no need in the attributes itself (Lithnet does this)
+            # referencing purposes, no need in the attributes themselves
             if ($member.Name -eq "ObjectID") {
                 # set the objectID of the object as the id of the xml node
                 $XmlOperation.SetAttribute("id", $member.Value.Value)
-                continue # Import-RmConfig creates an objectID in the new setup
+                continue
             }
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
             $xmlVarElement.Set_InnerText($member.Value)
