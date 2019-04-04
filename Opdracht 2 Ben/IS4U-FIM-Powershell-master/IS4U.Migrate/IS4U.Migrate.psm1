@@ -89,18 +89,18 @@ Function Start-Migration {
             $ImportAllConfigurations = $False
         }
         if ($ImportAllConfigurations) {
-            Compare-Schema -path $path
-            Compare-Portal -path $path
-            Compare-Policy -path $path
+            Compare-SchemaJson -path $path
+            Compare-PolicyJson -path $path
+            Compare-PortalJson -path $path
         } else {
             if ($ImportSchema) {
-                Compare-Schema -path $path
+                Compare-SchemaJson -path $path
             }
             if ($ImportPolicy) {
-                Compare-Policy -path $path
+                Compare-PolicyJson -path $path
             }
             if ($ImportPortal) {
-                Compare-Portal -path $path
+                Compare-PortalJson -path $path
             }
         }
         Remove-Variable ReferentialList -Scope Global

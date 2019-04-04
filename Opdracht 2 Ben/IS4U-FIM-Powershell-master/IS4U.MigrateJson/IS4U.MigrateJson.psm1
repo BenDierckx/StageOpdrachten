@@ -148,7 +148,7 @@ Function Compare-SchemaJson {
         $Global:ReferentialList.SourceRefObjs.Add($obj) | Out-Null
     }
     $bindingsSource = Get-ObjectsFromJson -JsonFilePath "ConfigBindings.json"
-    $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstSpecifiers.json"
+    $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstantSpecifiers.json"
     
     # Target Setup objects, comparing purposes
     # Makes target a json and then converts it to an object
@@ -198,7 +198,7 @@ Function Get-PolicyConfigToJson {
     if($syncRule){
         Convert-ToJson -Objects $syncRule -JsonName SynchronizationRules
     }
-    Convert-ToJson -Objects $syncFilter -JsonName SynchronizationFilter
+    Convert-ToJson -Objects $syncFilter -JsonName SynchronizationFilters
 }
 
 Function Compare-PolicyJson {
@@ -209,15 +209,15 @@ Function Compare-PolicyJson {
     )
     Write-Host "Starting compare of Policy configuration..."
     # Source of objects to be imported
-    $mgmntPlciesSrc = Get-ObjectsFromJson -JsonFilePath "ConfigPolicies.json"
+    $mgmntPlciesSrc = Get-ObjectsFromJson -JsonFilePath "ConfigManagementPolicyRules.json"
     $setsSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSets.json"
-    $workflowSrc = Get-ObjectsFromJson -JsonFilePath "ConfigWorkflows.json"
+    $workflowSrc = Get-ObjectsFromJson -JsonFilePath "ConfigWorkflowDefinitions.json"
     $emailSrc = Get-ObjectsFromJson -JsonFilePath "ConfigEmailTemplates.json"
     $filtersSrc = Get-ObjectsFromJson -JsonFilePath "ConfigFilterScopes.json"
-    $activitySrc = Get-ObjectsFromJson -JsonFilePath "ConfigActivityInfo.json"
-    $funcSrc = Get-ObjectsFromJson -JsonFilePath "ConfigPolicyFunctions.json"
-    $syncRSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSyncRules.json"
-    $syncFSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSyncFilters.json"
+    $activitySrc = Get-ObjectsFromJson -JsonFilePath "ConfigActivityInformationConfigurations.json"
+    $funcSrc = Get-ObjectsFromJson -JsonFilePath "ConfigFunctions.json"
+    $syncRSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSynchronizationRules.json"
+    $syncFSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSynchronizationFilters.json"
 
     # Target Setup objects, comparing purposes
     $mgmntPlciesDest = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
@@ -277,12 +277,12 @@ Function Compare-PortalJson {
     )
     Write-Host "Starting compare of Portal configuration..."
     # Source of objects to be imported
-    $UISrc = Get-ObjectsFromJson -JsonFilePath "ConfigPortalUI.json"
-    $navSrc = Get-ObjectsFromJson -JsonFilePath "ConfigNavBar.json"
-    $srchScopeSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSearchScope.json"
-    $objVisSrc = Get-ObjectsFromJson -JsonFilePath "ConfigObjectVisual.json"
-    $homePSrc = Get-ObjectsFromJson -JsonFilePath "ConfigHomePage.json"
-    $confSrc = Get-ObjectsFromJson -JsonFilePath "ConfigConfigurations"
+    $UISrc = Get-ObjectsFromJson -JsonFilePath "ConfigPortalUIConfigurations.json"
+    $navSrc = Get-ObjectsFromJson -JsonFilePath "ConfigNavigationBarConfigurations.json"
+    $srchScopeSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSearchScopeConfigurations.json"
+    $objVisSrc = Get-ObjectsFromJson -JsonFilePath "ConfigObjectVisualizationConfigurations.json"
+    $homePSrc = Get-ObjectsFromJson -JsonFilePath "ConfigHomepageConfigurations.json"
+    $confSrc = Get-ObjectsFromJson -JsonFilePath "ConfigConfigurations.json"
 
     # Target Setup objects, comparing purposes
     $UIDest = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
@@ -323,11 +323,11 @@ Function Get-ObjectsFromConfig {
             }
         }
         $updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
-        $object = ConvertFrom-Json -InputObject $updatedObjs
+        $objects = ConvertFrom-Json -InputObject $updatedObjs
     } else {
         Write-Host "No objects found to write to json"
     }
-    return $object
+    return $objects
 }
 
 Function Convert-ToJson {
