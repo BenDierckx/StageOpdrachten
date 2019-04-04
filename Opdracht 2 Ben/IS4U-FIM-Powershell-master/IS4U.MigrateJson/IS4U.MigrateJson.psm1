@@ -90,18 +90,18 @@ Function Start-MigrationJson {
             $ImportAllConfigurations = $False
         }
         if ($ImportAllConfigurations) {
-            Compare-Schema -path $path
-            Compare-Portal -path $path
-            Compare-Policy -path $path
+            Compare-SchemaJson -path $path
+            Compare-PortalJson -path $path
+            Compare-PolicyJson -path $path
         } else {
             if ($ImportSchema) {
-                Compare-Schema -path $path
+                Compare-SchemaJson -path $path
             }
             if ($ImportPolicy) {
-                Compare-Policy -path $path
+                Compare-PolicyJson -path $path
             }
             if ($ImportPortal) {
-                Compare-Portal -path $path
+                Compare-PortalJson -path $path
             }
         }
         Remove-Variable ReferentialList -Scope Global
@@ -358,7 +358,7 @@ Function Get-ObjectsFromJson {
     try {
         $objs = Get-Content $JsonFilePath | ConvertFrom-Json
         return $objs
-    } catch {
+    } catch [System.Management.Automation.ItemNotFoundException] {
         Write-Host "File not found $JsonFilePath" -ForegroundColor Red
     }
 }
@@ -414,7 +414,7 @@ Function Compare-Objects {
                 $RefToAttrSrc = $Global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
                 $RefToAttrDest = $Global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
 
-                $RefToObjSrc = $Global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Name}
+                $RefToObjSrc = $Global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
                 $RefToObjDest = $Global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
 
                 $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
@@ -423,24 +423,13 @@ Function Compare-Objects {
                 $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
             }
-        }
-        # These members are different in every environment, remove them before add or compare
-        $illegalMembers = @("CreatedTime", "Creator", "DeletedTime", "DetectedRulesList",
-             "ExpectedRulesList", "ResourceTime", "ComputedMember")
+        }   
         # If there is no match between the objects from different sources, the not found object will be added for import
         if (!$obj2) {
-            foreach($illMemb in $illegalMembers) {
-                $obj.psobject.properties.remove("$illMemb")
-                $obj2.psobject.properties.Remove("$illMemb")
-            }
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             $difference.Add($obj)
         } else {
-            foreach($illMemb in $illegalMembers) {
-                $obj.psobject.properties.remove("$illMemb")
-                $obj2.psobject.properties.Remove("$illMemb")
-            }
             # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
