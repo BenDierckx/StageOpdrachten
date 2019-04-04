@@ -313,7 +313,6 @@ function Get-ObjectsFromConfig {
         Write-ToCliXml -Objects $objects -xmlName Temp   
         $objects = Import-Clixml "ConfigTemp.xml"
     } else {
-        #$objects | Export-Clixml -Path "tempConfig.xml" -Depth 4
         Write-Host "No objects found to write to clixml!"
     }
     return $objects
@@ -367,6 +366,7 @@ Function Compare-MimObjects {
     $i = 1
     $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
+    $bindings = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total objects" -PercentComplete ($i/$total*100)
         Write-Host "`rComparing $i/$total...`t" -NoNewline
@@ -374,7 +374,7 @@ Function Compare-MimObjects {
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
         } elseif ($Anchor.Count -eq 2) {
-            # If the ObjectType is a binding
+            # If the Object has referentials
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 # Find the corresponding object that matches the BoundAttributeType ID
                 $RefToAttrSrc = $global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
@@ -410,12 +410,18 @@ Function Compare-MimObjects {
         if (!$obj2) {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
+            if ($Anchor -contains "BoundObjectType" -and $Anchor -contains "BoundAttributeType") { 
+                $bindings.Add($RefToAttrSrc) | Out-Null
+                $bindings.Add($RefToObjSrc) | Out-Null
+            }
             $difference.Add($obj)
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID     
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+                $attrId = $obj.BoundAttributeType
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
+                $objId = $obj.BoundObjectType
                 $obj.BoundObjectType = $obj2.BoundObjectType
             }
             
@@ -426,9 +432,19 @@ Function Compare-MimObjects {
                 #Write-Host $obj -BackgroundColor Green -ForegroundColor Black
                 #Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
                 $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
+                $resultComp = $compObj | Where-Object membertype -like 'noteproperty'
+                $newObj = [PSCustomObject] @{}
+                foreach($mem in $resultComp){
+                    $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $Mem.Value
+                }
                 Write-host "Different object properties found:"
-                Write-host $compObj -ForegroundColor Yellow -BackgroundColor Black
-                $difference.Add($compObj)
+                Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
+                $difference.Add($newObj)
+                if ($newObj.psobject.properties.Name -contains "BoundAttributeType" -and 
+                $newObj.psobject.properties.Name -contains "BoundObjectType") { 
+                    $bindings.Add($RefToAttrSrc) | Out-Null
+                    $bindings.Add($RefToObjSrc) | Out-Null
+                }
             }
         }
     }
@@ -436,6 +452,9 @@ Function Compare-MimObjects {
         Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
+    }
+    if ($bindings) {
+        Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
     }
 }
 
@@ -501,7 +520,7 @@ Function Write-ToXmlFile {
             if ($member.Name -eq "ObjectType") { continue }
             # insert ArrayList values into the configuration
             if($member.Value){
-                if ($member.Value.GetType().BaseType.Name -eq "ArrayList") { 
+                if ($member.Value.GetType().Name -eq "ArrayList") { 
                     foreach ($m in $member.Value) {
                         $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
                         $xmlVarElement.Set_InnerText($m)
@@ -519,13 +538,18 @@ Function Write-ToXmlFile {
                 continue
             }
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
+            if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
+                $xmlVarElement.Set_InnerText($member.Value.Value)
+                $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                $xmlVariable.SetAttribute("operation", "replace")
+                $xmlVariable.SetAttribute("name", $member.Name)
+                $xmlVariable.SetAttribute("type", "xmlref")
+                continue
+            }
             $xmlVarElement.Set_InnerText($member.Value)
             $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
             $xmlVariable.SetAttribute("operation", "replace")
             $xmlVariable.SetAttribute("name", $member.Name)
-            if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
-                $xmlVariable.SetAttribute("type", "xmlref")
-            }
         }
     }
     # Save the xml 

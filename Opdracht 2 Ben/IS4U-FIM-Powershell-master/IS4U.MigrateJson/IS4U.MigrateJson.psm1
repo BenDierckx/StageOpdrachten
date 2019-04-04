@@ -384,6 +384,7 @@ Function Compare-Objects {
     $i = 1
     $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
+    $bindings = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
         Write-Host "`rComparing $i/$total... `t" -NoNewline
@@ -428,6 +429,10 @@ Function Compare-Objects {
         if (!$obj2) {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
+            if ($Acnhor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+                $bindings.Add($RefToAttrSrc) | Out-Null
+                $bindings.Add($RefToObjSrc) | Out-Null
+            }
             $difference.Add($obj)
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
@@ -444,9 +449,18 @@ Function Compare-Objects {
                 #Write-Host $obj -BackgroundColor Green -ForegroundColor Black
                 #Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
                 $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
+                $resultComp = $compObj | Where-Object membertype -Like 'noteproperty'
+                $newObj = [PSCustomObject]@{}
+                foreach ($mem in $resultComp) {
+                    $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $mem.Value
+                }
                 Write-host "Different object properties found:"
                 Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
-                $difference.Add($compObj)
+                $difference.Add($newObj)
+                if($newObj.psobject.Properties.Name -contains "BoundAttributeType") {
+                    $bindings.Add($RefToAttrDest) | Out-Null
+                    $bidnings.Add($RefToObjDest) | Out-Null
+                }
             }
         }
     }
@@ -519,7 +533,7 @@ Function Write-ToXmlFile {
             if ($member.Name -eq "ObjectType") { continue }
             # insert ArrayList values into the configuration
             if($member.Value){
-                if ($member.Value.GetType().BaseType.Name -eq "ArrayList") { 
+                if ($member.Value.GetType().Name -eq "ArrayList") { 
                     foreach ($m in $member.Value) {
                         $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
                         $xmlVarElement.Set_InnerText($m)
@@ -537,13 +551,18 @@ Function Write-ToXmlFile {
                 continue # Import-RmConfig creates an objectID in the new setup
             }
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
+            if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
+                $xmlVarElement.Set_InnerText($member.Value.Value)
+                $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                $xmlVariable.SetAttribute("operation", "replace")
+                $xmlVariable.SetAttribute("name", $member.Name)
+                $xmlVariable.SetAttribute("type", "xmlref")
+                continue
+            }
             $xmlVarElement.Set_InnerText($member.Value)
             $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
             $xmlVariable.SetAttribute("operation", "replace")
             $xmlVariable.SetAttribute("name", $member.Name)
-            if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
-                $xmlVariable.SetAttribute("type", "xmlref")
-            }
         }
     }
     # Save the xml 
