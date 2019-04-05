@@ -368,8 +368,9 @@ Function Compare-MimObjects {
     $difference = [System.Collections.ArrayList] @()
     $bindings = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
+        $type = $obj.ObjectType
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total objects" -PercentComplete ($i/$total*100)
-        Write-Host "`rComparing $i/$total...`t" -NoNewline
+        Write-Host "`rComparing $Type objects: $i/$total...`t`t" -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
@@ -382,11 +383,14 @@ Function Compare-MimObjects {
                 $RefToAttrDest = $global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
 
                 $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
-                $RefTOObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
-
-                #obj2 gets the correct object that corresponds to the source object
-                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
-                $_.BoundObjectType -like $RefToObjDest.ObjectID}
+                $RefToObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
+                if ($RefToAttrDest -and $RefToObjDest) {
+                    #obj2 gets the correct object that corresponds to the source object
+                    $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
+                    $_.BoundObjectType -like $RefToObjDest.ObjectID}
+                } else {
+                    $obj2 = ""
+                }
             } else {
                 $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and 
                 $_.($Anchor[1]) -like $obj.($Anchor[1])}
@@ -398,9 +402,12 @@ Function Compare-MimObjects {
 
                 $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
                 $RefTOObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
-
-                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
-                $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+                if ($RefToAttrDest -and $RefToObjDest) {
+                    $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
+                    $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+                } else {
+                    $obj2 = ""
+                }
             } else {
                 $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and 
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -like $obj.($Anchor[2])}
@@ -419,9 +426,7 @@ Function Compare-MimObjects {
             # Give the object the ObjectID from the target object => comparing reasons
             $obj.ObjectID = $obj2.ObjectID     
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
-                $attrId = $obj.BoundAttributeType
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
-                $objId = $obj.BoundObjectType
                 $obj.BoundObjectType = $obj2.BoundObjectType
             }
             

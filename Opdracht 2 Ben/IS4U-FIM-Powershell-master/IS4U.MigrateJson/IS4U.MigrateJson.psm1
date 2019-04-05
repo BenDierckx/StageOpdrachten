@@ -22,16 +22,22 @@ if(!(Get-Module -Name LithnetRMA)) {
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 
+# Csv problem: Arrays in the PsCustomObjects do not get the required depth
+
 Function Start-MigrationJson {
     <#
     .SYNOPSIS
     Starts the migration by either getting the source MIM setup or importing this setup in a MIM setup.
     
     .DESCRIPTION
-    If SourceOfMIMSetup is set to True, this function will call the function to get the resources and converts them to json.
-    This will be placed in json files and these are used when SourceOfMIMSetup is False.
+    Call Start-MigrationJson from the IS4U.MigrateJson folder!
+    If the parameter SourceOfMIMSetup is set to True, Start-MigrationJson will call the functions to
+    get the resources from the configuration and converts these resources to a json format. 
+    The json objects than get written to json files for each object type.
+    The results in the json files are used when SourceOfMIMSetup is False.
     To import the resources, call Start-MigrationJson from this folder. It will serialize the target MIM setup resources to json and
-    deserialize them so they can be compared. After that the different object(s) (new or different properties) will be written to
+    deserialize them so they can be compared with the resources from the source json files. 
+    After that the different object(s) (new or different properties) will be written to
     a delta configuration xml file. This Lithnet format xml file then gets imported in the target MIM Setup.  
     
     .PARAMETER SourceOfMIMSetup
@@ -386,8 +392,9 @@ Function Compare-Objects {
     $difference = [System.Collections.ArrayList] @()
     $bindings = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
+        $type = $obj.ObjectType
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
-        Write-Host "`rComparing $i/$total... `t" -NoNewline
+        Write-Host "`rComparing $type objects: $i/$total... `t" -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
@@ -402,9 +409,14 @@ Function Compare-Objects {
                 $RefToObjSrc = $Global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
                 $RefToObjDest = $Global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
 
-                #obj2 gets the correct object that corresponds to the source object
-                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
-                $_.BoundObjectType -like $RefToObjDest.ObjectID}
+                if ($RefToAttrDest -and $RefToObjDest) {
+                    #obj2 gets the correct object that corresponds to the source object
+                    $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
+                    $_.BoundObjectType -like $RefToObjDest.ObjectID}
+                } else {
+                    $obj2 = ""
+                }
+
             } else {
                 $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
                 $_.($Anchor[1]) -like $obj.($Anchor[1])}
@@ -418,8 +430,14 @@ Function Compare-Objects {
                 $RefToObjSrc = $Global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
                 $RefToObjDest = $Global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
 
-                $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
-                $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
+                if ($RefToAttrDest -and $RefToObjDest) {
+                    #obj2 gets the correct object that corresponds to the source object
+                    $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and 
+                    $_.BoundObjectType -like $RefToObjDest.ObjectID}
+                } else {
+                    $obj2 = ""
+                }
+
             } else {
                 $obj2 = $ObjsDestination | Where-Object {$_.($Anchor[0]) -like $obj.($Anchor[0]) -and `
                 $_.($Anchor[1]) -like $obj.($Anchor[1]) -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
