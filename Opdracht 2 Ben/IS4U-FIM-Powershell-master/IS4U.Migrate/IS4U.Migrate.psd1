@@ -77,7 +77,7 @@
     # Functions to export from this module
     FunctionsToExport = 'Start-Migration', 'Compare-Schema', 'Compare-Policy', 'Compare-Portal', 'Get-SchemaConfigToXml',
     'Get-PolicyConfigToXml', 'Get-PortalConfigToXml', 'Get-ObjectsFromConfig', 'Write-ToCliXml', 'Get-ObjectsFromXml', 'Compare-MimObjects', 
-    'Write-ToXmlFile', 'Import-Delta'
+    'Write-ToXmlFile', 'Select-FolderDialog', 'Import-Delta'
     
     # Cmdlets to export from this module
     CmdletsToExport = ''

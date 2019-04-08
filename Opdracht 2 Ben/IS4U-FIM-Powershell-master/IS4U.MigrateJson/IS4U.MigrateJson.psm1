@@ -86,6 +86,10 @@ Function Start-MigrationJson {
     $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
     SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
 
+    # Force the path for the ExePath to IS4U.MigrateJson
+    $ExePath = $PSScriptRoot
+    Set-Location $ExePath
+
     if ($SourceOfMIMSetup) {
         Get-SchemaConfigToJson
         Get-PortalConfigToJson
@@ -111,6 +115,9 @@ Function Start-MigrationJson {
             }
         }
         Remove-Variable ReferentialList -Scope Global
+        Write-Host "Choose what you want to import" -ForegroundColor "Blue"
+        $exeFile = "$ExePath\FimDelta.exe"
+        & $exeFile "$path/ConfigurationDelta.json"
         if (Test-Path -Path "$path/ConfigurationDelta.json") {
             Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.json"
         } else {
@@ -483,7 +490,7 @@ Function Compare-Objects {
         }
     }
     if ($difference) {
-        Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor
+        Write-ToXmlFile -DifferenceObjects $difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
     }

@@ -643,7 +643,7 @@ Function Update-ObjectType {
 	return $obj.ObjectID.Value
 }
 
-Function Remove-ObjectType { ## Gaat niet, geen rechten tot verwijderen van system objects
+Function Remove-ObjectType {
 <#
 	.SYNOPSIS
 	Remove an object type from the FIM Portal schema.
@@ -659,8 +659,7 @@ Function Remove-ObjectType { ## Gaat niet, geen rechten tot verwijderen van syst
 		[String]
 		$Name
 	)
-	## pipelining works, when testing the pipeline will not be accepted
-	#Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
+	Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
 	$id = Get-Resource -ObjectType ObjectTypeDescription -AttributeName Name -AttributeValue $Name -AttributesToGet ObjectID
 	Remove-Resource -ID $id.ObjectID.Value
 }

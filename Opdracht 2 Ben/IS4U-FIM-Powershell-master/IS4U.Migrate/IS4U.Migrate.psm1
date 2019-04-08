@@ -23,9 +23,6 @@ Import-Module LithnetRMA;
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 
-# Csv problem: Arrays in the PsCustomObjects do not get the required depth
-# CliXml problems: Array of 1 object gets serialized to string
-#                  AttributeValueArrayList gets deserialized to ArrayList from xml
 Function Start-Migration {
     <#
     .SYNOPSIS
@@ -33,16 +30,16 @@ Function Start-Migration {
     
     .DESCRIPTION
     Call Start-Migration from the IS4U.Migrate folder!
-    If the parameter SourceOfMIMSetup is set to True, Start-Migration will call the functions to
+    If the parameter ExportMIMToXml is set to True, Start-Migration will call the functions to
     get the resources from the configuration and converts these resources to a CliXml format. 
     The CliXml objects than get written to xml files for each object type.
-    The results in xml files are used when SourceOfMIMSetup is False.
+    The results in xml files are used when ExportMIMToXml is False.
     To import the resources, call Start-Migration from this folder. It will serialize the target MIM setup resources to clixml and
     deserialize them so they can be compared with the resources from the source xml files. 
     After that the different object(s) (new or different properties) will be written to
     a delta configuration xml file. This Lithnet format xml file then gets imported in the target MIM Setup.  
     
-    .PARAMETER SourceOfMIMSetup
+    .PARAMETER ExportMIMToXml
     If True will get the xml files from the source MIM environment.
     If False will import the resources in the generated xml files.
 
@@ -52,7 +49,7 @@ Function Start-Migration {
     configurations where the parameters are set to True, in this case the Schema configuration.
     
     .EXAMPLE
-    Start-Migration -SourceOfMIMSetup $True
+    Start-Migration -ExportMIMToXml $True
     Start-Migration
     Start-Migration -ImportPolicy $True
 
@@ -64,7 +61,7 @@ Function Start-Migration {
     param(
         [Parameter(Mandatory=$False)]
         [Bool]
-        $SourceOfMIMSetup = $False,
+        $ExportMIMToXml = $False,
         
         [Parameter(Mandatory=$False)]
         [Bool]
@@ -82,8 +79,11 @@ Function Start-Migration {
     # ReferentialList to store Objects and Attributes in memory for reference of bindings
     $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList] @();
     SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
+    # Force directory to .\IS4U.Migrate
+    $ExePath = $PSScriptRoot
+    Set-Location $ExePath
 
-    if ($SourceOfMIMSetup) {
+    if ($ExportMIMToXml) {
         Get-SchemaConfigToXml
         Get-PortalConfigToXml
         Get-PolicyConfigToXml
@@ -109,7 +109,14 @@ Function Start-Migration {
         }
         Remove-Variable ReferentialList -Scope Global
         if (Test-Path -Path "$Path/ConfigurationDelta.xml") {
-            Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.xml"
+            Write-Host "Choose what will be imported." -ForegroundColor "Green"
+            $exeFile = "$ExePath\FimDelta.exe"
+            Start-Process $exeFile "$Path/ConfigurationDelta.xml" -Wait
+            if (Test-Path -Path "$Path/ConfigurationDelta2.xml") {
+                Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta2.xml"   
+            } else {
+                Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.xml"
+            }
         } else {
             Write-Host "No configurationDelta file found: Not created or no differences."
         } 
@@ -401,7 +408,7 @@ Function Compare-MimObjects {
                 $RefToAttrDest = $global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
 
                 $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
-                $RefTOObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
+                $RefToObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
                 if ($RefToAttrDest -and $RefToObjDest) {
                     $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
                     $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
