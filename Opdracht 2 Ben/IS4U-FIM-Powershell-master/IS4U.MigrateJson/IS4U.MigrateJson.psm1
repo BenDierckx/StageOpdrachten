@@ -62,11 +62,7 @@ Function Start-MigrationJson {
     param(
         [Parameter(Mandatory=$False)]
         [Bool]
-        $SourceOfMIMSetup = $False,
-        
-        [Parameter(Mandatory=$False)]
-        [Bool]
-        $ImportAllConfigurations = $true,
+        $ExportMIMToXml = $False,
         
         [Parameter(Mandatory=$False)]
         [Bool]
@@ -90,7 +86,7 @@ Function Start-MigrationJson {
     $ExePath = $PSScriptRoot
     Set-Location $ExePath
 
-    if ($SourceOfMIMSetup) {
+    if ($ExportMIMToXml) {
         Get-SchemaConfigToJson
         Get-PortalConfigToJson
         Get-PolicyConfigToJson
@@ -118,6 +114,7 @@ Function Start-MigrationJson {
         Write-Host "Choose what you want to import" -ForegroundColor "Blue"
         $exeFile = "$ExePath\FimDelta.exe"
         & $exeFile "$path/ConfigurationDelta.json"
+        Start-Process $exeFile "$Path/ConfigurationDelta.xml" -Wait
         if (Test-Path -Path "$path/ConfigurationDelta.json") {
             Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.json"
         } else {
@@ -493,6 +490,9 @@ Function Compare-Objects {
         Write-ToXmlFile -DifferenceObjects $difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
+    }
+    if ($bindings) {
+        Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
     }
 }
 
