@@ -1,4 +1,7 @@
-Import-Module IS4U.MigrateJson
+Import-Module IS4U.Migrate
+
+# Navigate to the "/IS4U.Migrate" folder
+# Start tests with PS> Invoke-Pester
 
 # Set-ExecutionPolicy -Scope Process Unrestricted
 
@@ -49,11 +52,7 @@ Describe "Testing compare-objects" {
     Compare-MimObjects -ObjsSource $array1 -ObjsDestination $array2 -Anchor Name -path $path
     
 }
-
-
-Import-Module IS4U.Migrate
-# Navigate to the "/IS4U.Migrate" folder
-# Start tests with PS> Invoke-Pester 
+ 
 Describe "Start-Migration export"{
     Mock Get-SchemaConfigToXml -ModuleName IS4U.Migrate
     Mock Get-PortalConfigToXml -ModuleName IS4U.Migrate
@@ -210,5 +209,43 @@ Describe "Compare-MimObjects" {
             }
         }
         Remove-Variable bindings -Scope Global
+    }
+}
+
+Describe "Write-ToXmlFile" {
+    $path = (Get-PSDrive TestDrive).Root
+    $objs = @([PSCustomObject]@{
+                Name = "AttrTest"
+                ObjectType = "AttributeTypeDescription"}, 
+                [PSCustomObject]@{
+                Name = "ObjectTest"
+                ObjectType = "ObjectTypeDescription"},
+                [PSCustomObject]@{
+                Name = "Ttest"
+                ObjectType = "BindingDescription"})
+    Context "Test" {
+        Write-ToXmlFile -path $path -DifferenceObjects $objs -Anchor @("Name")
+        it "ConfigurationDelta.xml is created" {
+            "TestDrive:\ConfigurationDelta.xml" | Should Exist
+        }
+        $content = [System.Xml.XmlDocument] (Get-Content "TestDrive:\ConfigurationDelta.xml")
+        it "Xml-file has correct Lithnet structure"{
+            $content."Lithnet.ResourceManagement.ConfigSync" | Should not benullorempty
+            $content.'Lithnet.ResourceManagement.ConfigSync'.Operations | Should not benullorempty
+            $resourceOp = $content.'Lithnet.ResourceManagement.ConfigSync'.Operations.ResourceOperation
+            $resourceOp | Should not benullorempty
+            $OperationAttrOfResOp = $resourceOp[0]
+            $OperationAttrOfResOp.operation | Should be "Add Update"
+            $OperationAttrOfResOp.resourceType | Should be "AttributeTypeDescription"
+            $OperationAttrOfResOp.AnchorAttributes.AnchorAttribute | Should be "Name"  
+        }
+        it "File contains correct objects" {
+            $objects = $content."Lithnet.ResourceManagement.ConfigSync".Operations.ResourceOperation.AttributeOperations
+            $objects[0].AttributeOperation.InnerText | Should be "AttrTest"
+            $objects[1].AttributeOperation.InnerText | Should be "ObjectTest"
+            $objects[2].AttributeOperation.InnerText | Should be "Ttest"
+            $xmlAttribute = $objects[0].AttributeOperation | Select-Object Name
+            $xmlAttribute.name | Should be "Name"
+        }
     }
 }
