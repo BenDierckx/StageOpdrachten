@@ -76,18 +76,29 @@ Function Start-Migration {
         $ImportPortal = $False
     )
     $ImportAllConfigurations = $True
-    # ReferentialList to store Objects and Attributes in memory for reference of bindings
-    $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList] @();
-    SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
     # Force directory to .\IS4U.Migrate
     $ExePath = $PSScriptRoot
-    Set-Location $ExePath
+    #Set-Location $ExePath
 
     if ($ExportMIMToXml) {
-        Get-SchemaConfigToXml
-        Get-PortalConfigToXml
-        Get-PolicyConfigToXml
+        Write-Host "Starting export of current MIM configuration to xml files. (This will overwrite existing MIM-config xml files!)"
+        $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+        while ($conf -notmatch "[y/Y/n/N]") {
+            $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+        }
+        if ($conf.ToLower() -eq "y"){
+            Get-SchemaConfigToXml
+            Get-PortalConfigToXml
+            Get-PolicyConfigToXml
+        } else {
+            Write-Host "Export cancelled."
+        }
+        
     } else {
+        # ReferentialList to store Objects and Attributes in memory for reference of bindings
+        $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList] @();
+        SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
+        $global:bindings = [System.Collections.ArrayList] @()
         $path = Select-FolderDialog
         if ($ImportSchema -or $ImportPolicy -or $ImportPortal) {
             $ImportAllConfigurations = $False
@@ -108,18 +119,20 @@ Function Start-Migration {
             }
         }
         Remove-Variable ReferentialList -Scope Global
-        if (Test-Path -Path "$Path/ConfigurationDelta.xml") {
-            Write-Host "Choose what will be imported." -ForegroundColor "Green"
+        Remove-Variable bindings -Scope Global
+        
+        if (Test-Path -Path "$Path\ConfigurationDelta.xml") {
+            Write-Host "Select objects to be imported." -ForegroundColor "Green"
             $exeFile = "$ExePath\FimDelta.exe"
-            Start-Process $exeFile "$Path/ConfigurationDelta.xml" -Wait
-            if (Test-Path -Path "$Path/ConfigurationDelta2.xml") {
-                Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta2.xml"   
+            Start-Process $exeFile "$Path\ConfigurationDelta.xml" -Wait
+            if (Test-Path -Path "$Path\ConfigurationDelta2.xml") {
+                Import-Delta -DeltaConfigFilePath "$path\ConfigurationDelta2.xml"
             } else {
-                Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.xml"
+                Import-Delta -DeltaConfigFilePath "$path\ConfigurationDelta.xml"
             }
         } else {
             Write-Host "No configurationDelta file found: Not created or no differences."
-        } 
+        }
     }
 }
 
@@ -373,10 +386,8 @@ Function Compare-MimObjects {
     $i = 1
     $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
-    $bindings = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         $type = $obj.ObjectType
-        #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total objects" -PercentComplete ($i/$total*100)
         Write-Host "`rComparing $Type objects: $i/$total...`t`t" -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
@@ -408,7 +419,7 @@ Function Compare-MimObjects {
                 $RefToAttrDest = $global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
 
                 $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
-                $RefToObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
+                $RefTOObjDest = $global:ReferentialList.DestRefObjs | Where-Object{$_.Name -eq $RefToObjSrc.Name}
                 if ($RefToAttrDest -and $RefToObjDest) {
                     $obj2 = $ObjsDestination | Where-Object {$_.BoundAttributeType -like $RefToAttrDest.ObjectID -and
                     $_.BoundObjectType -like $RefToObjDest.ObjectID -and $_.($Anchor[2]) -eq $obj.($Anchor[2])}
@@ -425,8 +436,12 @@ Function Compare-MimObjects {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             if ($Anchor -contains "BoundObjectType" -and $Anchor -contains "BoundAttributeType") { 
-                $bindings.Add($RefToAttrSrc) | Out-Null
-                $bindings.Add($RefToObjSrc) | Out-Null
+                if ($bindings -notcontains $RefToAttrSrc) {
+                    $global:bindings.Add($RefToAttrSrc) | Out-Null
+                }
+                if ($bindings -notcontains $RefToObjSrc) {
+                    $global:bindings.Add($RefToObjSrc) | Out-Null   
+                }
             }
             $difference.Add($obj)
         } else {
@@ -443,7 +458,7 @@ Function Compare-MimObjects {
                 # To visually compare the differences yourself
                 #Write-Host $obj -BackgroundColor Green -ForegroundColor Black
                 #Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
-                $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
+                $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in source object!
                 $resultComp = $compObj | Where-Object membertype -like 'noteproperty'
                 $newObj = [PSCustomObject] @{}
                 foreach($mem in $resultComp){
@@ -454,8 +469,12 @@ Function Compare-MimObjects {
                 $difference.Add($newObj)
                 if ($newObj.psobject.properties.Name -contains "BoundAttributeType" -and 
                 $newObj.psobject.properties.Name -contains "BoundObjectType") { 
-                    $bindings.Add($RefToAttrSrc) | Out-Null
-                    $bindings.Add($RefToObjSrc) | Out-Null
+                    if ($bindings -notcontains $RefToAttrSrc) {
+                        $global:bindings.Add($RefToAttrSrc) | Out-Null
+                    }
+                    if ($bindings -notcontains $RefToObjSrc) {
+                        $global:bindings.Add($RefToObjSrc) | Out-Null   
+                    }
                 }
             }
         }
@@ -485,7 +504,7 @@ Function Write-ToXmlFile {
         $Anchor
     )
     # Inititalization xml file
-    $FileName = "$path/configurationDelta.xml"
+    $FileName = "$path\configurationDelta.xml"
     # Create empty starting lithnet configuration xml file
     if (!(Test-Path -Path $FileName)) {
         [xml]$Doc = New-Object System.Xml.XmlDocument

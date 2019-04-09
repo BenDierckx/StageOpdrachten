@@ -78,19 +78,29 @@ Function Start-MigrationJson {
     )
 
     $ImportAllConfigurations = $True
-    # ReferentialList to store Objects and Attributes in memory for reference of bindings
-    $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
-    SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
 
     # Force the path for the ExePath to IS4U.MigrateJson
     $ExePath = $PSScriptRoot
     Set-Location $ExePath
 
     if ($ExportMIMToXml) {
-        Get-SchemaConfigToJson
-        Get-PortalConfigToJson
-        Get-PolicyConfigToJson
+        Write-Host "Starting export of current MIM configuration to json files. (This will overwrite existing MIM-config json files!)"
+        $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+        while ($conf -notmatch "[y/Y/n/N]") {
+            $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+        }
+        if ($conf.ToLower() -eq "y"){
+            Get-SchemaConfigToJson
+            Get-PortalConfigToJson
+            Get-PolicyConfigToJson
+        } else {
+            Write-Host "Export cancelled."
+        }
     } else {
+        # ReferentialList to store Objects and Attributes in memory for reference of bindings
+        $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
+        SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
+        $global:bindings = [System.Collections.ArrayList] @()
         $path = Select-FolderDialog
         if ($ImportSchema -or $ImportPolicy -or $ImportPortal) {
             $ImportAllConfigurations = $False
@@ -111,12 +121,17 @@ Function Start-MigrationJson {
             }
         }
         Remove-Variable ReferentialList -Scope Global
-        Write-Host "Choose what you want to import" -ForegroundColor "Blue"
-        $exeFile = "$ExePath\FimDelta.exe"
-        & $exeFile "$path/ConfigurationDelta.json"
-        Start-Process $exeFile "$Path/ConfigurationDelta.xml" -Wait
-        if (Test-Path -Path "$path/ConfigurationDelta.json") {
-            Import-Delta -DeltaConfigFilePath "$path/ConfigurationDelta.json"
+        Remove-Variable bindings -Scope Global
+
+        if (Test-Path -Path "$Path\ConfigurationDelta.xml") {
+            Write-Host "Select objects to be imported." -ForegroundColor "Green"
+            $exeFile = "$ExePath\FimDelta.exe"
+            Start-Process $exeFile "$Path\ConfigurationDelta.xml" -Wait
+            if (Test-Path -Path "$Path\ConfigurationDelta2.xml") {
+                Import-Delta -DeltaConfigFilePath "$path\ConfigurationDelta2.xml"
+            } else {
+                Import-Delta -DeltaConfigFilePath "$path\ConfigurationDelta.xml"
+            }
         } else {
             Write-Host "No configurationDelta file found: Not created or no differences."
         }
@@ -394,7 +409,6 @@ Function Compare-Objects {
     $i = 1
     $total = $ObjsSource.Count
     $difference = [System.Collections.ArrayList] @()
-    $bindings = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         $type = $obj.ObjectType
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
@@ -452,8 +466,12 @@ Function Compare-Objects {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
             if ($Acnhor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
-                $bindings.Add($RefToAttrSrc) | Out-Null
-                $bindings.Add($RefToObjSrc) | Out-Null
+                if ($bindings -notcontains $RefToAttrSrc) {
+                    $global:bindings.Add($RefToAttrSrc) | Out-Null
+                }
+                if ($bindings -notcontains $RefToObjSrc) {
+                    $global:bindings.Add($RefToObjSrc) | Out-Null   
+                }
             }
             $difference.Add($obj)
         } else {
@@ -479,9 +497,14 @@ Function Compare-Objects {
                 Write-host "Different object properties found:"
                 Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
                 $difference.Add($newObj)
-                if($newObj.psobject.Properties.Name -contains "BoundAttributeType") {
-                    $bindings.Add($RefToAttrDest) | Out-Null
-                    $bidnings.Add($RefToObjDest) | Out-Null
+                if ($newObj.psobject.Properties.Name -contains "BoundAttributeType" -and 
+                $newObj.psobject.properties.Name -contains "BoundObjectType") {
+                    if ($bindings -notcontains $RefToAttrSrc) {
+                        $global:bindings.Add($RefToAttrSrc) | Out-Null
+                    }
+                    if ($bindings -notcontains $RefToObjSrc) {
+                        $global:bindings.Add($RefToObjSrc) | Out-Null   
+                    }
                 }
             }
         }

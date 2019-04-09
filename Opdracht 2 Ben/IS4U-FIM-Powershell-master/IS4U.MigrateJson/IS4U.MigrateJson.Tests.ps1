@@ -46,6 +46,21 @@ Describe "Testing compare-objects" {
         }
     )
 
-    Compare-Objects -ObjsSource $array1 -ObjsDestination $array2 -Anchor Name -path $path
-    
+    Compare-Objects -ObjsSource $array1 -ObjsDestination $array2 -Anchor Name -path $path  
+}
+
+Describe "test"{
+    $path = Select-FolderDialog
+    $ExePath = $PSScriptRoot
+    Set-Location $ExePath
+    if (Test-Path -Path "$Path/ConfigurationDelta.xml") {
+        Write-Host "Choose what will be imported!" -ForegroundColor "Blue"
+        $exeFile = "$ExePath\FimDelta.exe"
+        Start-Process $exeFile "$Path/ConfigurationDelta.xml" -Wait
+        if (Test-Path -Path "$Path/ConfigurationDelta2.xml") {
+            Write-Host "ok"   
+        } else {
+            Write-Host "te snel"
+        }
+    }
 }
