@@ -15,7 +15,6 @@ Describe "Testing compare-objects" {
                 Value = "1"
             }
         },
-
         [PSCustomObject]@{
             Name = "Test2"
             Rank = "Admin"
@@ -25,7 +24,6 @@ Describe "Testing compare-objects" {
             }
         }
     )
-
     $Array2 = @(
         [PSCustomObject]@{
             Name = "Test1"
@@ -35,7 +33,6 @@ Describe "Testing compare-objects" {
                 Value = "1"
             }
         },
-
         [PSCustomObject]@{
             Name = "Test2"
             Rank = "Admin"
@@ -49,18 +46,199 @@ Describe "Testing compare-objects" {
     Compare-Objects -ObjsSource $array1 -ObjsDestination $array2 -Anchor Name -path $path  
 }
 
-Describe "test"{
-    $path = Select-FolderDialog
-    $ExePath = $PSScriptRoot
-    Set-Location $ExePath
-    if (Test-Path -Path "$Path/ConfigurationDelta.xml") {
-        Write-Host "Choose what will be imported!" -ForegroundColor "Blue"
-        $exeFile = "$ExePath\FimDelta.exe"
-        Start-Process $exeFile "$Path/ConfigurationDelta.xml" -Wait
-        if (Test-Path -Path "$Path/ConfigurationDelta2.xml") {
-            Write-Host "ok"   
-        } else {
-            Write-Host "te snel"
+Describe "Start-MigrationJson export"{
+    Mock Get-SchemaConfigToJson -ModuleName IS4U.MigrateJson
+    Mock Get-PortalConfigToJson -ModuleName IS4U.MigrateJson
+    Mock Get-PolicyConfigToJson -ModuleName IS4U.MigrateJson
+    Mock Write-Host -ModuleName "IS4U.MigrateJson"
+    context "With parameter ExportMIMToJson and user chooses 'y'"{
+        Mock Read-Host {return "y"} -ModuleName "IS4U.MigrateJson"
+        Start-MigrationJson -ExportMIMToJson $True
+        it "Start Migration calls correct functions when ExportMIMToJson param is True" {
+            Assert-MockCalled Get-PolicyConfigToJson -ModuleName "IS4U.MigrateJson"
+            Assert-MockCalled Get-SchemaConfigToJson -ModuleName "IS4U.MigrateJson"
+            Assert-MockCalled Get-PortalConfigToJson -ModuleName "IS4U.MigrateJson"
+        }
+    }
+    Context "With parameter ExportMIMToJson and user chooses 'n'"{
+        Mock Read-Host {return "n"} -ModuleName "IS4U.MigrateJson"
+        Start-MigrationJson -ExportMIMToJson $True
+        it "Start-MigrationJson will not export when user chooses 'n'" {
+            Assert-MockCalled Get-PolicyConfigToJson -ModuleName "IS4U.MigrateJson" -Exactly 0
+            Assert-MockCalled Get-SchemaConfigToJson -ModuleName "IS4U.MigrateJson" -Exactly 0
+            Assert-MockCalled Get-PortalConfigToJson -ModuleName "IS4U.MigrateJson" -Exactly 0
+        }
+    }
+}
+
+Describe "Start-MigrationJson import" {
+    Mock Compare-SchemaJson -ModuleName "IS4U.MigrateJson"
+    Mock Compare-PolicyJson -ModuleName "IS4U.MigrateJson"
+    Mock Compare-PortalJson -ModuleName "IS4U.MigrateJson"
+    Mock Import-Delta -ModuleName "IS4U.MigrateJson"
+    Mock Select-FolderDialog {
+        return "./testPath"
+    } -ModuleName "IS4U.MigrateJson"
+    Mock Start-Process -ModuleName "IS4U.MigrateJson"
+    Mock Write-Host -ModuleName "IS4U.MigrateJson"
+    context "No parameters"{
+        Start-MigrationJson
+        it "Correct path gets send"{
+            Assert-MockCalled Compare-SchemaJson -ParameterFilter {
+                $Path -eq "./testPath"
+            } -ModuleName "IS4U.MigrateJson"
+        }
+        it "All compares get called once" {
+            Assert-MockCalled Compare-SchemaJson -ModuleName "IS4U.MigrateJson" -Exactly 1
+            Assert-MockCalled Compare-PortalJson -ModuleName "IS4U.MigrateJson" -Exactly 1
+            Assert-MockCalled Compare-PolicyJson -ModuleName "IS4U.MigrateJson" -Exactly 1
+        }
+    }
+    context "With parameter ImportSchema" {
+        Start-MigrationJson -ImportSchema $True
+        it "Only Compare-SchemaJson gets called" {
+            Assert-MockCalled Compare-SchemaJson -ModuleName "IS4U.MigrateJson" -Exactly 1
+            Assert-MockCalled Compare-PortalJson -ModuleName "IS4U.MigrateJson" -Exactly 0
+            Assert-MockCalled Compare-PolicyJson -ModuleName "IS4U.MigrateJson" -Exactly 0
+        }
+    }
+}
+
+Describe "Compare-Objects" {
+    Mock Write-ToXmlFile -ModuleName "IS4U.MigrateJson"
+    Context "No differences in objects" {
+        $objs1 = @(
+            [PSCustomObject]@{
+                Name = "AttrTest"
+                ObjectID = "555"
+                ObjectType = "AttributeTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "ObjTest"
+                ObjectID = "456"
+                ObjectType = "ObjectTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "Ttest"
+                ObjectID = "123"
+                ObjectType = "BindingDescription"
+                BoundAttributeType = "555"
+                BoundObjectType = "456"
+            }
+        )
+        $objs2 = @(
+            [PSCustomObject]@{
+                Name = "AttrTest"
+                ObjectID = "555"
+                ObjectType = "AttributeTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "ObjTest"
+                ObjectID = "456"
+                ObjectType = "ObjectTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "Ttest"
+                ObjectID = "123"
+                ObjectType = "BindingDescription"
+                BoundAttributeType = "555"
+                BoundObjectType = "456"
+            }
+        )
+        $global:bindings = @()
+        Compare-Objects -ObjsSource $objs1 -ObjsDestination $objs2 -path "./testPath"
+        It "No differences should be found" {
+            Assert-MockCalled Write-ToXmlFile -ModuleName "IS4U.MigrateJson" -Exactly 0
+        }
+    }
+
+    Context "Differences in objects" {
+        $objs1 = @(
+            [PSCustomObject]@{
+                Name = "At"
+                ObjectID = "555"
+                ObjectType = "AttributeTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "ObjTest"
+                ObjectID = "456"
+                ObjectType = "ObjectTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "Ttest"
+                ObjectID = "123"
+                ObjectType = "BindingDescription"
+                BoundAttributeType = "555"
+                BoundObjectType = "456"
+            }
+        )
+        $objs2 = @(
+            [PSCustomObject]@{
+                Name = "AttrTest"
+                ObjectID = "555"
+                ObjectType = "AttributeTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "Ob"
+                ObjectID = "456"
+                ObjectType = "ObjectTypeDescription"
+            },
+            [PSCustomObject]@{
+                Name = "Ttest"
+                ObjectID = "123"
+                ObjectType = "BindingDescription"
+                BoundAttributeType = "555"
+                BoundObjectType = "456"
+            }
+        )
+        Mock Write-Host -ModuleName "IS4U.MigrateJson"
+        Compare-Objects -ObjsSource $objs1 -ObjsDestination $objs2 -path "./testPath"
+        It "Differences should be found and Write-ToXmlFile is called with correct differences" {
+            Assert-MockCalled Write-ToXmlFile -ModuleName "IS4U.MigrateJson" -Exactly 1 -ParameterFilter {
+                $DifferenceObjects[0].Name -eq "At"
+                $DifferenceObjects[0].ObjectID | Should be "555"
+                $DifferenceObjects[1].Name | Should be "ObjTest"
+                $DifferenceObjects[1].ObjectID | Should be "456"
+            }
+        }
+        Remove-Variable bindings -Scope Global
+    }
+}
+
+Describe "Write-ToXmlFile" {
+    $path = (Get-PSDrive TestDrive).Root
+    $objs = @([PSCustomObject]@{
+                Name = "AttrTest"
+                ObjectType = "AttributeTypeDescription"}, 
+                [PSCustomObject]@{
+                Name = "ObjectTest"
+                ObjectType = "ObjectTypeDescription"},
+                [PSCustomObject]@{
+                Name = "Ttest"
+                ObjectType = "BindingDescription"})
+    Context "Test" {
+        Write-ToXmlFile -path $path -DifferenceObjects $objs -Anchor @("Name")
+        it "ConfigurationDelta.xml is created" {
+            "TestDrive:\ConfigurationDelta.xml" | Should Exist
+        }
+        $content = [System.Xml.XmlDocument] (Get-Content "TestDrive:\ConfigurationDelta.xml")
+        it "Xml-file has correct Lithnet structure"{
+            $content."Lithnet.ResourceManagement.ConfigSync" | Should not benullorempty
+            $content.'Lithnet.ResourceManagement.ConfigSync'.Operations | Should not benullorempty
+            $resourceOp = $content.'Lithnet.ResourceManagement.ConfigSync'.Operations.ResourceOperation
+            $resourceOp | Should not benullorempty
+            $OperationAttrOfResOp = $resourceOp[0]
+            $OperationAttrOfResOp.operation | Should be "Add Update"
+            $OperationAttrOfResOp.resourceType | Should be "AttributeTypeDescription"
+            $OperationAttrOfResOp.AnchorAttributes.AnchorAttribute | Should be "Name"  
+        }
+        it "File contains correct objects" {
+            $objects = $content."Lithnet.ResourceManagement.ConfigSync".Operations.ResourceOperation.AttributeOperations
+            $objects[0].AttributeOperation.InnerText | Should be "AttrTest"
+            $objects[1].AttributeOperation.InnerText | Should be "ObjectTest"
+            $objects[2].AttributeOperation.InnerText | Should be "Ttest"
+            $xmlAttribute = $objects[0].AttributeOperation | Select-Object Name
+            $xmlAttribute.name | Should be "Name"
         }
     }
 }

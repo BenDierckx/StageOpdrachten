@@ -62,7 +62,7 @@ Function Start-MigrationJson {
     param(
         [Parameter(Mandatory=$False)]
         [Bool]
-        $ExportMIMToXml = $False,
+        $ExportMIMToJson = $False,
         
         [Parameter(Mandatory=$False)]
         [Bool]
@@ -83,7 +83,7 @@ Function Start-MigrationJson {
     $ExePath = $PSScriptRoot
     Set-Location $ExePath
 
-    if ($ExportMIMToXml) {
+    if ($ExportMIMToJson) {
         Write-Host "Starting export of current MIM configuration to json files. (This will overwrite existing MIM-config json files!)"
         $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
         while ($conf -notmatch "[y/Y/n/N]") {
@@ -465,7 +465,7 @@ Function Compare-Objects {
         if (!$obj2) {
             Write-Host "New object found:"
             Write-Host $obj -ForegroundColor yellow
-            if ($Acnhor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
+            if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 if ($bindings -notcontains $RefToAttrSrc) {
                     $global:bindings.Add($RefToAttrSrc) | Out-Null
                 }
