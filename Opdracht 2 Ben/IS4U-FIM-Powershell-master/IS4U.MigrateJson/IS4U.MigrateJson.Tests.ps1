@@ -223,22 +223,36 @@ Describe "Write-ToXmlFile" {
         }
         $content = [System.Xml.XmlDocument] (Get-Content "TestDrive:\ConfigurationDelta.xml")
         it "Xml-file has correct Lithnet structure"{
+            # Initial structure
             $content."Lithnet.ResourceManagement.ConfigSync" | Should not benullorempty
             $content.'Lithnet.ResourceManagement.ConfigSync'.Operations | Should not benullorempty
+            # ResourceOperation
             $resourceOp = $content.'Lithnet.ResourceManagement.ConfigSync'.Operations.ResourceOperation
             $resourceOp | Should not benullorempty
-            $OperationAttrOfResOp = $resourceOp[0]
-            $OperationAttrOfResOp.operation | Should be "Add Update"
-            $OperationAttrOfResOp.resourceType | Should be "AttributeTypeDescription"
-            $OperationAttrOfResOp.AnchorAttributes.AnchorAttribute | Should be "Name"  
+            $OperationOfResOp = $resourceOp[0]
+            # Attributes of ResourceOperation
+            $OperationOfResOp.operation | Should be "Add Update"
+            $OperationOfResOp.resourceType | Should be "AttributeTypeDescription"
+            # Anchor
+            $OperationOfResOp.AnchorAttributes.AnchorAttribute | Should be "Name"  
         }
         it "File contains correct objects" {
             $objects = $content."Lithnet.ResourceManagement.ConfigSync".Operations.ResourceOperation.AttributeOperations
-            $objects[0].AttributeOperation.InnerText | Should be "AttrTest"
+            $AttributeWithArray =  $objects[0].AttributeOperation
+            # ArrayList test
+            $AttributeWithArray[0].InnerText | Should be "AttrTest"
+            $AttributeWithArray[1].InnerText | Should be "test"
+            $AttributeWithArray[2].InnerText | Should be "test2"
+            $AttrsOfNode = $AttributeWithArray | Select-Object operation
+            # Attributes of xml object (with array) test
+            $AttrsOfNode[0].operation | Should be "Replace"
+            $AttrsOfNode[1].operation | Should be "Add"
+            $AttrsOfNode[2].operation | Should be "Add"
+            # Strings/objects test
             $objects[1].AttributeOperation.InnerText | Should be "ObjectTest"
             $objects[2].AttributeOperation.InnerText | Should be "Ttest"
             $xmlAttribute = $objects[0].AttributeOperation | Select-Object Name
-            $xmlAttribute.name | Should be "Name"
+            $xmlAttribute[0].name | Should be "Name"           
         }
     }
 }
