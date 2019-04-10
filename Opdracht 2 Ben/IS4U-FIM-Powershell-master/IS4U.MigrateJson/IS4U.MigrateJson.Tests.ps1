@@ -1,5 +1,8 @@
 Import-Module IS4U.MigrateJson
 
+# Navigate to the "/IS4U.MigrateJson" folder
+# Start tests with PS> Invoke-Pester
+
 # Set-ExecutionPolicy -Scope Process Unrestricted
 
 Describe "Testing compare-objects" {

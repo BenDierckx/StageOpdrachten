@@ -32,12 +32,12 @@ Function Start-Migration {
     Call Start-Migration from the IS4U.Migrate folder!
     If the parameter ExportMIMToXml is set to True, Start-Migration will call the functions to
     get the resources from the configuration and converts these resources to a CliXml format. 
-    The CliXml objects than get written to xml files for each object type.
+    The CliXml objects then get written to xml files for each object type.
     The results in xml files are used when ExportMIMToXml is False.
     To import the resources, call Start-Migration from this folder. It will serialize the target MIM setup resources to clixml and
     deserialize them so they can be compared with the resources from the source xml files. 
-    After that the different object(s) (new or different properties) will be written to
-    a delta configuration xml file. This Lithnet format xml file then gets imported in the target MIM Setup.  
+    Finally the different object(s) (new or different properties) will be written to
+    a delta configuration xml file. This (Lithnet format) xml file then gets imported in the target MIM Setup.  
     
     .PARAMETER ExportMIMToXml
     If True will get the xml files from the source MIM environment.
@@ -117,6 +117,9 @@ Function Start-Migration {
             if ($ImportPortal) {
                 Compare-Portal -path $path
             }
+        }
+        if ($bindings) {
+            Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
         }
         Remove-Variable ReferentialList -Scope Global
         Remove-Variable bindings -Scope Global
@@ -397,7 +400,7 @@ Function Compare-MimObjects {
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 # Find the corresponding object that matches the BoundAttributeType ID
                 $RefToAttrSrc = $global:ReferentialList.SourceRefAttrs | Where-Object{$_.ObjectID.Value -eq $obj.BoundAttributeType.Value}
-                # Find the corresponding object that matches the source binded attribute with the destination attibute by Name
+                # Find the corresponding object that matches the referenced source attribute with the destination attribute by Name
                 $RefToAttrDest = $global:ReferentialList.DestRefAttrs | Where-Object{$_.Name -eq $RefToAttrSrc.Name}
 
                 $RefToObjSrc = $global:ReferentialList.SourceRefObjs | Where-Object{$_.ObjectID.Value -eq $obj.BoundObjectType.Value}
@@ -483,9 +486,6 @@ Function Compare-MimObjects {
         Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
-    }
-    if ($bindings) {
-        Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
     }
 }
 

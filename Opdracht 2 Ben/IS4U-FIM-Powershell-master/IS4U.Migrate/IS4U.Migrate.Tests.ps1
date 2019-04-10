@@ -1,6 +1,7 @@
 Import-Module IS4U.Migrate
 # Navigate to the "/IS4U.Migrate" folder
 # Start tests with PS> Invoke-Pester 
+
 Describe "Start-Migration export"{
     Mock Get-SchemaConfigToXml -ModuleName IS4U.Migrate
     Mock Get-PortalConfigToXml -ModuleName IS4U.Migrate
@@ -209,7 +210,6 @@ Describe "Write-ToXmlFile" {
             $objects[2].AttributeOperation.InnerText | Should be "Ttest"
             $xmlAttribute = $objects[0].AttributeOperation | Select-Object Name
             $xmlAttribute[0].name | Should be "Name"
-            
         }
     }
 }

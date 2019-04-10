@@ -78,7 +78,6 @@ Function Start-MigrationJson {
     )
 
     $ImportAllConfigurations = $True
-
     # Force the path for the ExePath to IS4U.MigrateJson
     $ExePath = $PSScriptRoot
     Set-Location $ExePath
@@ -119,6 +118,9 @@ Function Start-MigrationJson {
             if ($ImportPortal) {
                 Compare-PortalJson -path $path
             }
+        }
+        if ($bindings) {
+            Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
         }
         Remove-Variable ReferentialList -Scope Global
         Remove-Variable bindings -Scope Global
@@ -513,9 +515,6 @@ Function Compare-Objects {
         Write-ToXmlFile -DifferenceObjects $difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
-    }
-    if ($bindings) {
-        Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
     }
 }
 
