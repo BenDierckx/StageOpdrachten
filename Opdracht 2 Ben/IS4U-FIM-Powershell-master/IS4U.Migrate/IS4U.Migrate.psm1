@@ -112,6 +112,14 @@ Function Start-Migration {
                 Compare-Schema -path $path
             }
             if ($ImportPolicy) {
+                $attrsSource = Get-ObjectsFromXml -XmlFilePath "ConfigAttributes.xml"
+                foreach($objt in $attrsSource) {
+                    $global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
+                }
+                $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+                foreach($objt in $attrsDest) {
+                    $global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
+                }
                 Compare-Policy -path $path
             }
             if ($ImportPortal) {
@@ -119,7 +127,7 @@ Function Start-Migration {
             }
         }
         if ($bindings) {
-            Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
+            Write-ToXmlFile -DifferenceObjects $Global:bindings -path $path -Anchor @("Name")
         }
         Remove-Variable ReferentialList -Scope Global
         Remove-Variable bindings -Scope Global
@@ -211,7 +219,8 @@ Function Compare-Policy {
     # Comparing of the Source and Target Setup to create delta xml file
     Write-Host "Starting compare of Policy configuration..."
     Compare-MimObjects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName") -path $path
-    Compare-MimObjects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
+    # Only import sets if policy exists for permission
+    #Compare-MimObjects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
     Compare-MimObjects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName") -path $path
     Compare-MimObjects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName") -path $path
     Compare-MimObjects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName") -path $path
@@ -552,10 +561,26 @@ Function Write-ToXmlFile {
             # insert ArrayList values into the configuration
             if($member.Value){
                 if ($member.Value.GetType().Name -eq "ArrayList") { 
+                    if($member.Name -eq "ExplicitMember") {
+                        continue
+                    }
                     foreach ($m in $member.Value) {
                         $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
-                        $xmlVarElement.Set_InnerText($m)
-                        $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                        if ($member.Name -eq "AllowedAttributes"){
+                            $RefToAttrSrc = $Global:ReferentialList.SourceRefAttrs | Where-Object {
+                                $_.ObjectID.Value -eq $m.Value
+                            }
+                            $xmlVarElement.Set_InnerText($RefToAttrSrc.ObjectID.Value)
+                            $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                            $xmlVariable.SetAttribute("type", "xmlref")
+                            if($bindings -notcontains $RefToAttrSrc) {
+                                $Global:bindings.Add($RefToAttrSrc) | Out-Null
+                            }
+                        } else {
+                            $xmlVarElement.Set_InnerText($m)
+                            $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                        }
+                        
                         $xmlVariable.SetAttribute("operation", "add")
                         $xmlVariable.SetAttribute("name", $member.Name)
                     }

@@ -113,6 +113,14 @@ Function Start-MigrationJson {
                 Compare-SchemaJson -path $path
             }
             if ($ImportPolicy) {
+                $attrsSource = Get-ObjectsFromJson -XmlFilePath "ConfigAttributes.json"
+                foreach($objt in $attrsSource) {
+                    $global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
+                }
+                $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+                foreach($objt in $attrsDest) {
+                    $global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
+                }
                 Compare-PolicyJson -path $path
             }
             if ($ImportPortal) {
@@ -259,7 +267,8 @@ Function Compare-PolicyJson {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName") -path $path
-    Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
+    # Only import sets if policy exists for permission
+    #Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
     Compare-Objects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName") -path $path
     Compare-Objects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName") -path $path
     Compare-Objects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName") -path $path
@@ -325,8 +334,9 @@ Function Compare-PortalJson {
     Compare-Objects -ObjsSource $srchScopeSrc -ObjsDestination $srchScopeDest -Anchor @("DisplayName", "Order") -path $path
     Compare-Objects -ObjsSource $objVisSrc -ObjsDestination $objVisDest -Anchor @("DisplayName") -path $path
     Compare-Objects -ObjsSource $homePSrc -ObjsDestination $homePDest -Anchor @("DisplayName") -path $path
+    # Could be empty
     if ($confSrc -and $confDest) {
-        Compare-MimObjects -ObjsSource $confSrc -ObjsDestination $confDest -Anchor @("DisplayName") -path $path # Can be empty
+        Compare-MimObjects -ObjsSource $confSrc -ObjsDestination $confDest -Anchor @("DisplayName") -path $path 
     }
     Write-Host "Compare of Portal configuration completed."
 }
@@ -581,10 +591,26 @@ Function Write-ToXmlFile {
             # insert ArrayList values into the configuration
             if($member.Value){
                 if ($member.Value.GetType().Name -eq "ArrayList") { 
+                    if($member.Name -eq "ExplicitMember") {
+                        continue
+                    }
                     foreach ($m in $member.Value) {
                         $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
-                        $xmlVarElement.Set_InnerText($m)
-                        $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                        if ($member.Name -eq "AllowedAttributes"){
+                            $RefToAttrSrc = $Global:ReferentialList.SourceRefAttrs | Where-Object {
+                                $_.ObjectID.Value -eq $m.Value
+                            }
+                            $xmlVarElement.Set_InnerText($RefToAttrSrc.ObjectID.Value)
+                            $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                            $xmlVariable.SetAttribute("type", "xmlref")
+                            if($bindings -notcontains $RefToAttrSrc) {
+                                $Global:bindings.Add($RefToAttrSrc) | Out-Null
+                            }
+                        } else {
+                            $xmlVarElement.Set_InnerText($m)
+                            $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
+                        }
+                        
                         $xmlVariable.SetAttribute("operation", "add")
                         $xmlVariable.SetAttribute("name", $member.Name)
                     }
