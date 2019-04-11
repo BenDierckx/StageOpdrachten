@@ -369,11 +369,11 @@ Function Get-ObjectsFromXml {
         [String]
         $xmlFilePath
     )
-    try{
+    if (Test-Path $xmlFilePath) {
         $objs = Import-Clixml -Path $xmlFilePath
         return $objs
-    } catch [System.Management.Automation.ItemNotFoundException] {
-        Write-Host "File not found $xmlFilePath" -ForegroundColor Red
+    } else {
+        Write-Host "$xmlFilePath not found (no objects from source or not created)." -ForegroundColor Red
     }
 }
 
@@ -463,6 +463,16 @@ Function Compare-MimObjects {
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
                 $obj.BoundObjectType = $obj2.BoundObjectType
+            }
+            # Sorts arrayLists befor compare
+            if (($obj.psobject.members.TypeNameOfValue -like "*ArrayList").Count -gt 0) {
+                foreach($objMem in $obj.psobject.members) {
+                    if($objMem.Value -and $objMem.Value.GetType().Name -eq "ArrayList") {
+                        $obj2Mem = $obj2.psobject.members | Where-Object {$_.Name -eq $objMem.Name}
+                        $objMem.Value = $objMem.Value | Sort-Object
+                        $obj2Mem.Value = $obj2Mem.Value | Sort-Object
+                    }
+                }
             }
             
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru

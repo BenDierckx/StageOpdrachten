@@ -61,19 +61,19 @@ Function Start-MigrationJson {
     #>
     param(
         [Parameter(Mandatory=$False)]
-        [Bool]
+        [Switch]
         $ExportMIMToJson = $False,
         
         [Parameter(Mandatory=$False)]
-        [Bool]
+        [Switch]
         $ImportSchema=$False,
         
         [Parameter(Mandatory=$FAlse)]
-        [Bool]
+        [Switch]
         $ImportPolicy = $False,
         
         [Parameter(Mandatory=$False)]
-        [Bool]
+        [Switch]
         $ImportPortal = $False
     )
 
@@ -268,8 +268,8 @@ Function Compare-PolicyJson {
 
     # Comparing of the Source and Target Setup to create delta xml file
     Compare-Objects -ObjsSource $mgmntPlciesSrc -ObjsDestination $mgmntPlciesDest -Anchor @("DisplayName") -path $path
-    # Only import sets if policy exists for permission
-    #Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
+    # Only import sets if policy grants permission for all the attributes from sets
+    Compare-Objects -ObjsSource $setsSrc -ObjsDestination $setsDest -Anchor @("DisplayName") -path $path
     Compare-Objects -ObjsSource $workflowSrc -ObjsDestination $workflowDest -Anchor @("DisplayName") -path $path
     Compare-Objects -ObjsSource $emailSrc -ObjsDestination $emailDest -Anchor @("DisplayName") -path $path
     Compare-Objects -ObjsSource $filtersSrc -ObjsDestination $filtersDest -Anchor @("DisplayName") -path $path
@@ -393,11 +393,11 @@ Function Get-ObjectsFromJson {
         $JsonFilePath
     )
 
-    try {
+    if (Test-Path $JsonFilePath) {
         $objs = Get-Content $JsonFilePath | ConvertFrom-Json
         return $objs
-    } catch [System.Management.Automation.ItemNotFoundException] {
-        Write-Host "File not found $JsonFilePath" -ForegroundColor Red
+    } else {
+        Write-Host "$JsonFilePath not found (no objects from source or not created)." -ForegroundColor Red
     }
 }
 
@@ -494,6 +494,16 @@ Function Compare-Objects {
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
                 $obj.BoundObjectType = $obj2.BoundObjectType
+            }
+            # Sorts arrayLists befor compare
+            if (($obj.psobject.members.TypeNameOfValue -like "*ArrayList").Count -gt 0) {
+                foreach($objMem in $obj.psobject.members) {
+                    if($objMem.Value -and $objMem.Value.GetType().Name -eq "ArrayList") {
+                        $obj2Mem = $obj2.psobject.members | Where-Object {$_.Name -eq $objMem.Name}
+                        $objMem.Value = $objMem.Value | Sort-Object
+                        $obj2Mem.Value = $obj2Mem.Value | Sort-Object
+                    }
+                }
             }
             
             $compResult = Compare-Object -ReferenceObject $obj.psobject.members -DifferenceObject $obj2.psobject.members -PassThru
