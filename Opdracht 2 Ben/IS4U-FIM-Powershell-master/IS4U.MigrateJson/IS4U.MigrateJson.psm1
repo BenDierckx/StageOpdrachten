@@ -199,6 +199,7 @@ Function Compare-SchemaJson {
     $constSpecsDest = Get-ObjectsFromConfig -ObjectType ConstantSpecifier
 
     # Comparing of the Source and Target Setup to create delta xml file
+    Write-Host "Starting compare of Schema configuration..."
     Compare-Objects -ObjsSource $attrsSource -ObjsDestination $attrsDest -path $path
     Compare-Objects -ObjsSource $objsSource -ObjsDestination $objsDest -path $path
     Compare-Objects -ObjsSource $bindingsSource -ObjsDestination $bindingsDest -Anchor @("BoundAttributeType", "BoundObjectType") -path $path
@@ -488,6 +489,7 @@ Function Compare-Objects {
             $difference.Add($obj)
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
+            $OriginId = $obj.ObjectID
             $obj.ObjectID = $obj2.ObjectID
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
@@ -519,6 +521,7 @@ Function Compare-Objects {
                     }
                 }
             }
+            $obj.ObjectID = $OriginId
         }
     }
     if ($difference) {

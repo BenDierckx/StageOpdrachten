@@ -400,7 +400,7 @@ Function Compare-MimObjects {
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         $type = $obj.ObjectType
-        Write-Host "`rComparing $Type objects: $i/$total...`t`t" -NoNewline
+        Write-Host "`rComparing $Type objects: $i/$total...`t" -NoNewline
         $i++
         if ($Anchor.Count -eq 1) {
             $obj2 = $ObjsDestination | Where-Object{$_.($Anchor[0]) -eq $obj.($Anchor[0])}
@@ -458,6 +458,7 @@ Function Compare-MimObjects {
             $difference.Add($obj)
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
+            $OriginId = $obj.ObjectID
             $obj.ObjectID = $obj2.ObjectID     
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 $obj.BoundAttributeType = $obj2.BoundAttributeType
@@ -489,6 +490,7 @@ Function Compare-MimObjects {
                     }
                 }
             }
+            $obj.ObjectID = $OriginId
         }
     }
     if ($difference) {
