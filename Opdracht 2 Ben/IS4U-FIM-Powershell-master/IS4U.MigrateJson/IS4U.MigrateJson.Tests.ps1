@@ -85,7 +85,7 @@ Describe "Start-MigrationJson import" {
     Mock Start-Process -ModuleName "IS4U.MigrateJson"
     Mock Write-Host -ModuleName "IS4U.MigrateJson"
     context "No parameters"{
-        Start-MigrationJson
+        Start-MigrationJson -All
         it "Correct path gets send"{
             Assert-MockCalled Compare-SchemaJson -ParameterFilter {
                 $Path -eq "./testPath"

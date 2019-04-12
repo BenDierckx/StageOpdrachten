@@ -22,9 +22,7 @@ Import-Module LithnetRMA;
 }
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
-## TO DO: - Opsplitsen van import (delta(s) aanmaken en import achteraf)
-#         - Sets policy?
-#         - Bugfixes: explicitmembers (new mpr/ref naar persons?)
+
 Function Start-Migration {
     <#
     .SYNOPSIS
@@ -47,12 +45,12 @@ Function Start-Migration {
     from the chosen configurations, give the user the choice what will get imported and import them.
 
     .PARAMETER CompareSchema
-    This parameter is the same concept as ComparePolicy and ComparePortal:
-    When True, ImportAllConfigurations will be set to false, this will cause to only compare the
-    configurations where the parameters are set to True, in this case the Schema configuration.
+    This parameter has the same concept as ComparePolicy and ComparePortal:
+    When True, All will be set to false, this will cause to only compare the
+    configurations where the flags are called, in this case the Schema configuration.
     
     .EXAMPLE
-    Start-Migration
+    Start-Migration -All
     Start-Migration -ComparePolicy
     Start-Migration -ImportDelta
 
@@ -62,34 +60,40 @@ Function Start-Migration {
     When other function are called there is no guarantee the desired effect will be accomplished.
     #>
     param(
-        [Parameter(Mandatory=$False)]
+        [Parameter(Mandatory=$false)]
         [switch]
-        $CompareSchema=$False,
-        
-        [Parameter(Mandatory=$False)]
-        [switch]
-        $ComparePolicy = $False,
-        
-        [Parameter(Mandatory=$False)]
-        [switch]
-        $ComparePortal = $False,
+        $All,
 
         [Parameter(Mandatory=$False)]
         [switch]
-        $ImportDelta = $False
+        $CompareSchema,
+        
+        [Parameter(Mandatory=$False)]
+        [switch]
+        $ComparePolicy,
+        
+        [Parameter(Mandatory=$False)]
+        [switch]
+        $ComparePortal,
+
+        [Parameter(Mandatory=$False)]
+        [switch]
+        $ImportDelta
     )
-    $ImportAllConfigurations = $True
+    if (!($All.IsPresent -or $CompareSchema.IsPresent -or $ComparePolicy.IsPresent -or $ComparePortal.IsPresent -or $ImportDelta.IsPresent)) {
+        Write-Host "Use flag with Start-Migration (-All, -CompareSchema, -ComparePolicy, -ComparePortal or -ImportDelta)" -ForegroundColor Red
+        return
+    }
     $ExePath = $PSScriptRoot
-
     # ReferentialList to store Objects and Attributes in memory for reference of bindings
     $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList] @();
     SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
     $global:bindingRefs = [System.Collections.ArrayList] @()
     $path = Select-FolderDialog
     if ($CompareSchema -or $ComparePolicy -or $ComparePortal -or $ImportDelta) {
-        $ImportAllConfigurations = $False
+        $All = $False
     }
-    if ($ImportAllConfigurations) {
+    if ($All) {
         Compare-Schema -path $path
         Compare-Portal -path $path
         Compare-Policy -path $path
@@ -105,7 +109,7 @@ Function Start-Migration {
                     $global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
                 }
             }
-            $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+            $attrsDest = Get-ObjectsFromConfig -ObjectType /AttributeTypeDescription
             foreach($objt in $attrsDest) {
                 if (!($global:ReferentialList.DestRefAttrs -contains $objt)){
                     $global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
@@ -147,8 +151,16 @@ Function Export-MIMSetupToXml {
     Export the source resources from a MIM-Setup to xml files in a CliXml format.
     The created files are used with the function Start-Migration so resources can be compared
     between the two setups.
+
+    .Parameter XpathToSet
+    Give the xpath to a custom Set object. This will be created in a seperate xml file to be 
+    imported in the target MIM-Setup
     #>
-    
+    param(
+        [Parameter(Mandatory=$False)]
+        [String]
+        $XpathToSet
+    )
     Write-Host "Starting export of current MIM configuration to xml files. (This will overwrite existing MIM-config xml files!)"
     $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
     while ($conf -notmatch "[y/Y/n/N]") {
@@ -157,7 +169,7 @@ Function Export-MIMSetupToXml {
     if ($conf.ToLower() -eq "y"){
         Get-SchemaConfigToXml
         Get-PortalConfigToXml
-        Get-PolicyConfigToXml
+        Get-PolicyConfigToXml -xPathToSet $XpathToSet
     } else {
         Write-Host "Export cancelled."
     }
@@ -213,6 +225,10 @@ Function Compare-Policy {
     # Source of objects to be imported
     $mgmntPlciesSrc = Get-ObjectsFromXml -xmlFilePath "ConfigPolicies.xml"
     $setsSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSets.xml"
+    if (Test-Path("ConfigCustomSets.xml")) {
+        $CustomSetsSrc = Get-ObjectsFromXml -xmlFilePath "ConfigCustomSets.xml"
+        Write-ToXmlFile -DifferenceObjects $CustomSetsSrc -path $Path -Anchor @("DisplayName")
+    }
     $workflowSrc = Get-ObjectsFromXml -xmlFilePath "ConfigWorkflows.xml"
     $emailSrc = Get-ObjectsFromXml -xmlFilePath "ConfigEmailTemplates.xml"
     $filtersSrc = Get-ObjectsFromXml -xmlFilePath "ConfigFilterScopes.xml"
@@ -297,8 +313,17 @@ Function Get-SchemaConfigToXml {
 }
 
 Function Get-PolicyConfigToXml {
+    param(
+        [Parameter(Mandatory=$False)]
+        [String]
+        $xPathToSet
+    )
     $mgmntPolicies = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
     $sets = Get-ObjectsFromConfig -ObjectType Set
+    if ($xPathToSet) {
+        $xPathToSet -replace '[/]', ''
+        $CustomSets = Get-ObjectsFromConfig -ObjectType $xPathToSet
+    }
     $workflowDef = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
     $emailtmplt = Get-ObjectsFromConfig -ObjectType EmailTemplate
     $filterscope = Get-ObjectsFromConfig -ObjectType FilterScope
@@ -314,6 +339,9 @@ Function Get-PolicyConfigToXml {
     Write-ToCliXml -Objects $filterscope -xmlName FilterScopes 
     Write-ToCliXml -Objects $activityInfo -xmlName ActivityInfo 
     Write-ToCliXml -Objects $funct -xmlName PolicyFunctions
+    if ($CustomSets) {
+        Write-ToCliXml -Objects $CustomSets -xmlName CustomSets   
+    }
     if ($syncRule) {
         Write-ToCliXml -Objects $syncRule -xmlName SyncRules  
     }

@@ -37,7 +37,7 @@ Describe "Start-Migration import" {
     Mock Start-Process -ModuleName "IS4U.Migrate"
     Mock Write-Host -ModuleName "IS4U.Migrate"
     context "No parameters"{
-        Start-Migration
+        Start-Migration -All
         it "Correct path gets send"{
             Assert-MockCalled Compare-Schema -ParameterFilter {
                 $Path -eq "./testPath"

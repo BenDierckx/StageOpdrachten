@@ -51,7 +51,7 @@ Function Start-MigrationJson {
     configurations where the parameters are set to True, in this case the Schema configuration.
     
     .EXAMPLE
-    Start-MigrationJson
+    Start-MigrationJson -All
     Start-MigrationJson -CompareSchema
     Start-MigrationJson -ImportDelta
 
@@ -62,6 +62,10 @@ Function Start-MigrationJson {
     #>
     param(
         
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $All=$False,
+
         [Parameter(Mandatory=$False)]
         [Switch]
         $CompareSchema=$False,
@@ -79,10 +83,13 @@ Function Start-MigrationJson {
         $ImportDelta = $False
     )
 
-    $ImportAllConfigurations = $True
+    if (!($All.IsPresent -or $CompareSchema.IsPresent -or $ComparePolicy.IsPresent -or $ComparePortal.IsPresent -or $ImportDelta.IsPresent)) {
+        Write-Host "Use flag with Start-Migration (-All, -CompareSchema, -ComparePolicy, -ComparePortal or -ImportDelta)" -ForegroundColor Red
+        return
+    }
     # Force the path for the ExePath to IS4U.MigrateJson
     $ExePath = $PSScriptRoot
-    Set-Location $ExePath
+    #Set-Location $ExePath
 
     # ReferentialList to store Objects and Attributes in memory for reference of bindings
     $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
@@ -150,7 +157,16 @@ Function Export-MIMSetupToJson {
     Export the source resources from a MIM-Setup to json files in a json format.
     The created files are used with the function Start-Migration so resources can be compared
     between the two setups.
+
+    .Parameter XpathToSet
+    Give the xpath to a custom Set object. This will be created in a seperate json file to be 
+    imported in the target MIM-Setup
     #>
+    param(
+        [Parameter(Mandatory=$False)]
+        [String]
+        $XpathToSet
+    )
     Write-Host "Starting export of current MIM configuration to json files. (This will overwrite existing MIM-config json files!)"
     $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
     while ($conf -notmatch "[y/Y/n/N]") {
@@ -159,7 +175,7 @@ Function Export-MIMSetupToJson {
     if ($conf.ToLower() -eq "y"){
         Get-SchemaConfigToJson
         Get-PortalConfigToJson
-        Get-PolicyConfigToJson
+        Get-PolicyConfigToJson -xPathToSet $XpathToSet
     } else {
         Write-Host "Export cancelled."
     }
@@ -227,12 +243,16 @@ Function Compare-SchemaJson {
 Function Get-PolicyConfigToJson {
     param(
         [Parameter(Mandatory=$False)]
-        [Bool]
-        $Source = $False
+        [String]
+        $xPathToSet
     )
 
     $manPol = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
     $sets = Get-ObjectsFromConfig -ObjectType Set
+    if ($xPathToSet) {
+        $xPathToSet -replace '[/]', ''
+        $CustomSets = Get-ObjectsFromConfig -ObjectType $xPathToSet
+    }
     $workFlowDef = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
     $emailTem = Get-ObjectsFromConfig -ObjectType EmailTemplate
     $filterScope = Get-ObjectsFromConfig -ObjectType FilterScope
@@ -248,6 +268,9 @@ Function Get-PolicyConfigToJson {
     Convert-ToJson -Objects $filterScope -JsonName FilterScopes
     Convert-ToJson -Objects $actInfConf -JsonName ActivityInformationConfigurations
     Convert-ToJson -Objects $function -JsonName Functions
+    if ($CustomSets) {
+        Convert-ToJson -Objects $CustomSets -JsonName CustomSets   
+    }
     if($syncRule){
         Convert-ToJson -Objects $syncRule -JsonName SynchronizationRules
     }
@@ -264,6 +287,10 @@ Function Compare-PolicyJson {
     # Source of objects to be imported
     $mgmntPlciesSrc = Get-ObjectsFromJson -JsonFilePath "ConfigManagementPolicyRules.json"
     $setsSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSets.json"
+    if (Test-Path("ConfigCustomSets.xml")) {
+        $CustomSetsSrc = Get-ObjectsFromJson -JsonFilePath "ConfigCustomSets.json"
+        Write-ToXmlFile -DifferenceObjects $CustomSetsSrc -path $Path -Anchor @("DisplayName")
+    }
     $workflowSrc = Get-ObjectsFromJson -JsonFilePath "ConfigWorkflowDefinitions.json"
     $emailSrc = Get-ObjectsFromJson -JsonFilePath "ConfigEmailTemplates.json"
     $filtersSrc = Get-ObjectsFromJson -JsonFilePath "ConfigFilterScopes.json"
