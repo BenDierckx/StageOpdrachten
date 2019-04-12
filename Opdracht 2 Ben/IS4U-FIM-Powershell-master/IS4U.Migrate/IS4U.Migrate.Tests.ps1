@@ -1,24 +1,23 @@
 Import-Module IS4U.Migrate
 # Navigate to the "/IS4U.Migrate" folder
 # Start tests with PS> Invoke-Pester 
-
-Describe "Start-Migration export"{
+Describe "Export-MIMSetupToXml"{
     Mock Get-SchemaConfigToXml -ModuleName IS4U.Migrate
     Mock Get-PortalConfigToXml -ModuleName IS4U.Migrate
     Mock Get-PolicyConfigToXml -ModuleName IS4U.Migrate
     Mock Write-Host -ModuleName "IS4U.Migrate"
-    context "With parameter ExportMIMToXml and user chooses 'y'"{
+    context "With user chooses 'y'"{
         Mock Read-Host {return "y"} -ModuleName "IS4U.Migrate"
-        Start-Migration -ExportMIMToXml $True
+        Export-MIMSetupToXml
         it "Start Migration calls correct functions when ExportMIMToXml param is True" {
             Assert-MockCalled Get-PolicyConfigToXml -ModuleName "IS4U.Migrate"
             Assert-MockCalled Get-SchemaConfigToXml -ModuleName "IS4U.Migrate"
             Assert-MockCalled Get-PortalConfigToXml -ModuleName "IS4U.Migrate"
         }
     }
-    Context "With parameter ExportMIMToXml and user chooses 'n'"{
+    Context "With user chooses 'n'"{
         Mock Read-Host {return "n"} -ModuleName "IS4U.Migrate"
-        Start-Migration -ExportMIMToXml $True
+        Export-MIMSetupToXml
         it "Start-Migration will not export when user chooses 'n'" {
             Assert-MockCalled Get-PolicyConfigToXml -ModuleName "IS4U.Migrate" -Exactly 0
             Assert-MockCalled Get-SchemaConfigToXml -ModuleName "IS4U.Migrate" -Exactly 0
@@ -50,8 +49,8 @@ Describe "Start-Migration import" {
             Assert-MockCalled Compare-Policy -ModuleName "IS4U.Migrate" -Exactly 1
         }
     }
-    context "With parameter ImportSchema" {
-        Start-Migration -ImportSchema $True
+    context "With parameter CompareSchema" {
+        Start-Migration -CompareSchema
         it "Only Compare-Schema gets called" {
             Assert-MockCalled Compare-Schema -ModuleName "IS4U.Migrate" -Exactly 1
             Assert-MockCalled Compare-Portal -ModuleName "IS4U.Migrate" -Exactly 0

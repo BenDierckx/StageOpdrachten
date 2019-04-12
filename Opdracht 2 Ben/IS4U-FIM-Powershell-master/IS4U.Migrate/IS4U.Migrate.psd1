@@ -77,7 +77,7 @@
     # Functions to export from this module
     FunctionsToExport = 'Start-Migration', 'Compare-Schema', 'Compare-Policy', 'Compare-Portal', 'Get-SchemaConfigToXml',
     'Get-PolicyConfigToXml', 'Get-PortalConfigToXml', 'Get-ObjectsFromConfig', 'Write-ToCliXml', 'Get-ObjectsFromXml', 'Compare-MimObjects', 
-    'Write-ToXmlFile', 'Select-FolderDialog', 'Import-Delta'
+    'Write-ToXmlFile', 'Import-Delta', 'Export-MIMSetupToXml'
     
     # Cmdlets to export from this module
     CmdletsToExport = ''
@@ -127,4 +127,6 @@
     # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
     # DefaultCommandPrefix = ''
     
-}
+    }
+    
+    

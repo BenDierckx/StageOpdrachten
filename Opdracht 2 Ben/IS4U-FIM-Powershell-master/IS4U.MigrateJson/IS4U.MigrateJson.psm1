@@ -27,54 +27,56 @@ if(!(Get-Module -Name LithnetRMA)) {
 Function Start-MigrationJson {
     <#
     .SYNOPSIS
-    Starts the migration by either getting the source MIM setup or importing this setup in a MIM setup.
+    Starts the migration of a MIM-Setup by either comparing certain configurations
+    or importing a setup in a different target MIM-Setup.
     
     .DESCRIPTION
-    Call Start-MigrationJson from the IS4U.MigrateJson folder!
-    If the parameter SourceOfMIMSetup is set to True, Start-MigrationJson will call the functions to
-    get the resources from the configuration and converts these resources to a json format. 
-    The json objects than get written to json files for each object type.
-    The results in the json files are used when SourceOfMIMSetup is False.
-    To import the resources, call Start-MigrationJson from this folder. It will serialize the target MIM setup resources to json and
-    deserialize them so they can be compared with the resources from the source json files. 
-    After that the different object(s) (new or different properties) will be written to
-    a delta configuration xml file. This Lithnet format xml file then gets imported in the target MIM Setup.  
+    Call Start-MigrationJson from the IS4U.MigrateJson folder! 
+    The source MIM-Setup json files are acquired by calling Export-MIMConfig in the source environment.
+    Start-MigrationJson will serialize the target MIM setup resources to json and deserialize them
+    so they can be compared with the resources from the source json files.
+    The differences that are found are writen to a Lithnet-format xml file, called ConfigurationDelta.xml.
+    When ImportDelta is True or Start-MigrationJson is called without parameters, the FimDelta.exe program is 
+    called and the user can choose which resources get imported from the configuration delta.
+    The final (or total) configuration then gets imported in the target MIM-Setup.  
     
-    .PARAMETER SourceOfMIMSetup
-    If True will get the json files from the source MIM environment.
-    If False will import the resources in the generated json files.
+    .PARAMETER ImportDelta
+    When Start-MigrationJson is called with a parameter no import will be executed. To ensure the differences get
+    imported in the target MIM-Setup call 'Start-Migration -ImportDelta'. This will use the created ConfigurationDelta.xml
+    from the chosen configurations, give the user the choice what will get imported and import them.
 
-    .PARAMETER ImportSchema
-    This parameter has the same concept as ImportPolicy and ImportPortal
-    When True, ImportAllConfigurations will be set to false, this will cause to only import the
-    imports that are set to True
+    .PARAMETER CompareSchema
+    This parameter is the same concept as ComparePolicy and ComparePortal:
+    When True, ImportAllConfigurations will be set to false, this will cause to only compare the
+    configurations where the parameters are set to True, in this case the Schema configuration.
     
     .EXAMPLE
-    Start-MigrationJson -SourceOfMIMSetup $True
     Start-MigrationJson
-    Start-MigrationJson -ImportSchema $True
+    Start-MigrationJson -CompareSchema
+    Start-MigrationJson -ImportDelta
 
     .Notes
     IMPORTANT:
-    This module has been designed to only use the Start-MigrationJson function. When other function are called there is no
-    guarantee the desired effect will be accomplished.
+    This module has been designed to only use Start-MigrationJson and Export-MIMSetupToJson functions.
+    When other functions are called there is no guarantee the desired effect will be accomplished.
     #>
     param(
-        [Parameter(Mandatory=$False)]
-        [Switch]
-        $ExportMIMToJson = $False,
         
         [Parameter(Mandatory=$False)]
         [Switch]
-        $ImportSchema=$False,
+        $CompareSchema=$False,
         
         [Parameter(Mandatory=$FAlse)]
         [Switch]
-        $ImportPolicy = $False,
+        $ComparePolicy = $False,
         
         [Parameter(Mandatory=$False)]
         [Switch]
-        $ImportPortal = $False
+        $ComparePortal = $False,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $ImportDelta = $False
     )
 
     $ImportAllConfigurations = $True
@@ -82,57 +84,48 @@ Function Start-MigrationJson {
     $ExePath = $PSScriptRoot
     Set-Location $ExePath
 
-    if ($ExportMIMToJson) {
-        Write-Host "Starting export of current MIM configuration to json files. (This will overwrite existing MIM-config json files!)"
-        $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
-        while ($conf -notmatch "[y/Y/n/N]") {
-            $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
-        }
-        if ($conf.ToLower() -eq "y"){
-            Get-SchemaConfigToJson
-            Get-PortalConfigToJson
-            Get-PolicyConfigToJson
-        } else {
-            Write-Host "Export cancelled."
-        }
+    # ReferentialList to store Objects and Attributes in memory for reference of bindings
+    $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
+    SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
+    $Global:bindings = [System.Collections.ArrayList] @()
+    $path = Select-FolderDialog
+    if ($CompareSchema -or $ComparePolicy -or $ComparePortal -or $ImportDelta) {
+        $ImportAllConfigurations = $False
+    }
+    if ($ImportAllConfigurations) {
+        Compare-SchemaJson -path $path
+        Compare-PortalJson -path $path
+        Compare-PolicyJson -path $path
     } else {
-        # ReferentialList to store Objects and Attributes in memory for reference of bindings
-        $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
-        SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
-        $global:bindings = [System.Collections.ArrayList] @()
-        $path = Select-FolderDialog
-        if ($ImportSchema -or $ImportPolicy -or $ImportPortal) {
-            $ImportAllConfigurations = $False
-        }
-        if ($ImportAllConfigurations) {
+        if ($CompareSchema) {
             Compare-SchemaJson -path $path
-            Compare-PortalJson -path $path
+        }
+        if ($ComparePolicy) {
+            $attrsSource = Get-ObjectsFromJson -XmlFilePath "ConfigAttributes.json"
+            foreach($objt in $attrsSource) {
+                if(!($Global:ReferentialList.SourceRefAttrs -contains $objt)) {
+                    $Global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
+                }
+            }
+            $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+            foreach($objt in $attrsDest) {
+                if(!($Global:ReferentialList.DestRefAttrs -contains $objt)) {
+                    $Global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
+                }
+            }
             Compare-PolicyJson -path $path
-        } else {
-            if ($ImportSchema) {
-                Compare-SchemaJson -path $path
-            }
-            if ($ImportPolicy) {
-                $attrsSource = Get-ObjectsFromJson -XmlFilePath "ConfigAttributes.json"
-                foreach($objt in $attrsSource) {
-                    $global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
-                }
-                $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
-                foreach($objt in $attrsDest) {
-                    $global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
-                }
-                Compare-PolicyJson -path $path
-            }
-            if ($ImportPortal) {
-                Compare-PortalJson -path $path
-            }
         }
-        if ($bindings) {
-            Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
+        if ($ComparePortal) {
+            Compare-PortalJson -path $path
         }
+        }
+    if ($bindings) {
+        Write-ToXmlFile -DifferenceObjects $bindings -path $path -Anchor @("Name")
+    }
+
+    if ($ImportDelta) {
         Remove-Variable ReferentialList -Scope Global
         Remove-Variable bindings -Scope Global
-
         if (Test-Path -Path "$Path\ConfigurationDelta.xml") {
             Write-Host "Select objects to be imported." -ForegroundColor "Green"
             $exeFile = "$ExePath\FimDelta.exe"
@@ -145,6 +138,30 @@ Function Start-MigrationJson {
         } else {
             Write-Host "No configurationDelta file found: Not created or no differences."
         }
+    }
+}
+
+Function Export-MIMSetupToJson {
+    <#
+    .SYNOPSIS
+    Export the source resources from a MIM-Setup to json files in a json format.
+    
+    .DESCRIPTION
+    Export the source resources from a MIM-Setup to json files in a json format.
+    The created files are used with the function Start-Migration so resources can be compared
+    between the two setups.
+    #>
+    Write-Host "Starting export of current MIM configuration to json files. (This will overwrite existing MIM-config json files!)"
+    $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+    while ($conf -notmatch "[y/Y/n/N]") {
+        $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+    }
+    if ($conf.ToLower() -eq "y"){
+        Get-SchemaConfigToJson
+        Get-PortalConfigToJson
+        Get-PolicyConfigToJson
+    } else {
+        Write-Host "Export cancelled."
     }
 }
 
@@ -556,7 +573,7 @@ Function Write-ToXmlFile {
         $Anchor
     )
     # Inititalization xml file
-    $FileName = "$path/configurationDelta.xml"
+    $FileName = "$path\configurationDelta.xml"
     # Create empty starting lithnet configuration xml file
     if (!(Test-Path -Path $FileName)) {
         [xml]$Doc = New-Object System.Xml.XmlDocument
@@ -630,11 +647,11 @@ Function Write-ToXmlFile {
                     continue
                 }
             }
-            # referencing purposes, no need in the attributes itself (Lithnet does this)
+            # referencing purposes, no need in the attributes themselves
             if ($member.Name -eq "ObjectID") {
                 # set the objectID of the object as the id of the xml node
                 $XmlOperation.SetAttribute("id", $member.Value.Value)
-                continue # Import-RmConfig creates an objectID in the new setup
+                continue
             }
             $xmlVarElement = $XmlDoc.CreateElement("AttributeOperation")
             if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {

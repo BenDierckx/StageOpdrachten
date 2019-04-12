@@ -49,14 +49,14 @@ Describe "Testing compare-objects" {
     Compare-Objects -ObjsSource $array1 -ObjsDestination $array2 -Anchor Name -path $path  
 }
 
-Describe "Start-MigrationJson export"{
+Describe "Export-MIMSetupToJson export"{
     Mock Get-SchemaConfigToJson -ModuleName IS4U.MigrateJson
     Mock Get-PortalConfigToJson -ModuleName IS4U.MigrateJson
     Mock Get-PolicyConfigToJson -ModuleName IS4U.MigrateJson
     Mock Write-Host -ModuleName "IS4U.MigrateJson"
     context "With parameter ExportMIMToJson and user chooses 'y'"{
         Mock Read-Host {return "y"} -ModuleName "IS4U.MigrateJson"
-        Start-MigrationJson -ExportMIMToJson $True
+        Export-MIMSetupToJson
         it "Start Migration calls correct functions when ExportMIMToJson param is True" {
             Assert-MockCalled Get-PolicyConfigToJson -ModuleName "IS4U.MigrateJson"
             Assert-MockCalled Get-SchemaConfigToJson -ModuleName "IS4U.MigrateJson"
@@ -65,7 +65,7 @@ Describe "Start-MigrationJson export"{
     }
     Context "With parameter ExportMIMToJson and user chooses 'n'"{
         Mock Read-Host {return "n"} -ModuleName "IS4U.MigrateJson"
-        Start-MigrationJson -ExportMIMToJson $True
+        Export-MIMSetupToJson
         it "Start-MigrationJson will not export when user chooses 'n'" {
             Assert-MockCalled Get-PolicyConfigToJson -ModuleName "IS4U.MigrateJson" -Exactly 0
             Assert-MockCalled Get-SchemaConfigToJson -ModuleName "IS4U.MigrateJson" -Exactly 0
@@ -98,7 +98,7 @@ Describe "Start-MigrationJson import" {
         }
     }
     context "With parameter ImportSchema" {
-        Start-MigrationJson -ImportSchema $True
+        Start-MigrationJson -CompareSchema
         it "Only Compare-SchemaJson gets called" {
             Assert-MockCalled Compare-SchemaJson -ModuleName "IS4U.MigrateJson" -Exactly 1
             Assert-MockCalled Compare-PortalJson -ModuleName "IS4U.MigrateJson" -Exactly 0
@@ -212,6 +212,7 @@ Describe "Write-ToXmlFile" {
     $path = (Get-PSDrive TestDrive).Root
     $objs = @([PSCustomObject]@{
                 Name = "AttrTest"
+                Attr = [System.Collections.ArrayList]@("test", "test2")
                 ObjectType = "AttributeTypeDescription"}, 
                 [PSCustomObject]@{
                 Name = "ObjectTest"
@@ -219,7 +220,7 @@ Describe "Write-ToXmlFile" {
                 [PSCustomObject]@{
                 Name = "Ttest"
                 ObjectType = "BindingDescription"})
-    Context "Test" {
+    Context "With Anchor, custom objects and use of TestDrive:" {
         Write-ToXmlFile -path $path -DifferenceObjects $objs -Anchor @("Name")
         it "ConfigurationDelta.xml is created" {
             "TestDrive:\ConfigurationDelta.xml" | Should Exist
@@ -255,7 +256,7 @@ Describe "Write-ToXmlFile" {
             $objects[1].AttributeOperation.InnerText | Should be "ObjectTest"
             $objects[2].AttributeOperation.InnerText | Should be "Ttest"
             $xmlAttribute = $objects[0].AttributeOperation | Select-Object Name
-            $xmlAttribute[0].name | Should be "Name"           
+            $xmlAttribute[0].name | Should be "Name"
         }
     }
 }
