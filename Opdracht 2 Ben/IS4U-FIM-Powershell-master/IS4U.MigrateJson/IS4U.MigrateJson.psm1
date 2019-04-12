@@ -22,7 +22,12 @@ if(!(Get-Module -Name LithnetRMA)) {
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 
-# Csv problem: Arrays in the PsCustomObjects do not get the required depth
+<#
+To do:
+- installeren van Lithnet automatisch
+- Installeren van Wall automatisch
+- FimDelta geen duplicaten laten zien
+#>
 
 Function Start-MigrationJson {
     <#
@@ -465,6 +470,8 @@ Function Compare-Objects {
     )
     $i = 1
     $total = $ObjsSource.Count
+    $DifferenceCounter = 0
+    $NewObjCounter = 0
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         $type = $obj.ObjectType
@@ -520,8 +527,9 @@ Function Compare-Objects {
         }   
         # If there is no match between the objects from different sources, the not found object will be added for import
         if (!$obj2) {
-            Write-Host "New object found:"
-            Write-Host $obj -ForegroundColor yellow
+            #Write-Host "New object found:"
+            #Write-Host $obj -ForegroundColor yellow
+            $NewObjCounter++
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 if ($bindings -notcontains $RefToAttrSrc) {
                     $global:bindings.Add($RefToAttrSrc) | Out-Null
@@ -530,7 +538,7 @@ Function Compare-Objects {
                     $global:bindings.Add($RefToObjSrc) | Out-Null   
                 }
             }
-            $difference.Add($obj)
+            $difference.Add($obj) | Out-Null
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
             $OriginId = $obj.ObjectID
@@ -562,9 +570,10 @@ Function Compare-Objects {
                 foreach ($mem in $resultComp) {
                     $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $mem.Value
                 }
-                Write-host "Different object properties found:"
-                Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
-                $difference.Add($newObj)
+                #Write-host "Different object properties found:"
+                #Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
+                $DifferenceCounter++
+                $difference.Add($newObj) | Out-Null
                 if ($newObj.psobject.Properties.Name -contains "BoundAttributeType" -and 
                 $newObj.psobject.properties.Name -contains "BoundObjectType") {
                     if ($bindings -notcontains $RefToAttrSrc) {
@@ -579,6 +588,9 @@ Function Compare-Objects {
         }
     }
     if ($difference) {
+        Write-Host "Differences found!" -ForegroundColor Yellow
+        Write-Host "Found $NewObjCounter new $Type objects."
+        Write-Host "Found $DifferenceCounter different $Type objects."
         Write-ToXmlFile -DifferenceObjects $difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
@@ -634,7 +646,7 @@ Function Write-ToXmlFile {
         foreach($anch in $Anchor){
             $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
             $xmlElement.Set_InnerText($anch)
-            $XmlAnchors.AppendChild($xmlElement)
+            $XmlAnchors.AppendChild($xmlElement) | Out-Null
         }
         # Attributes of the object
         $xmlEle = $XmlDoc.CreateElement("AttributeOperations")

@@ -22,7 +22,12 @@ Import-Module LithnetRMA;
 }
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
-
+<#
+To do:
+- installeren van Lithnet automatisch
+- Installeren van Wall automatisch
+- FimDelta geen duplicaten laten zien
+#>
 Function Start-Migration {
     <#
     .SYNOPSIS
@@ -109,7 +114,7 @@ Function Start-Migration {
                     $global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
                 }
             }
-            $attrsDest = Get-ObjectsFromConfig -ObjectType /AttributeTypeDescription
+            $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
             foreach($objt in $attrsDest) {
                 if (!($global:ReferentialList.DestRefAttrs -contains $objt)){
                     $global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
@@ -439,6 +444,8 @@ Function Compare-MimObjects {
     )
     $i = 1
     $total = $ObjsSource.Count
+    $DifferenceCounter = 0
+    $NewObjCounter = 0
     $difference = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         $type = $obj.ObjectType
@@ -487,8 +494,9 @@ Function Compare-MimObjects {
         }
         # If there is no match between the objects from different sources the object will be added for import
         if (!$obj2) {
-            Write-Host "New object found:"
-            Write-Host $obj -ForegroundColor yellow
+            #Write-Host "New object found:"
+            #Write-Host $obj -ForegroundColor yellow
+            $NewObjCounter++
             if ($Anchor -contains "BoundObjectType" -and $Anchor -contains "BoundAttributeType") { 
                 if ($bindingRefs -notcontains $RefToAttrSrc) {
                     $global:bindingRefs.Add($RefToAttrSrc) | Out-Null
@@ -497,7 +505,7 @@ Function Compare-MimObjects {
                     $global:bindingRefs.Add($RefToObjSrc) | Out-Null   
                 }
             }
-            $difference.Add($obj)
+            $difference.Add($obj) | Out-Null
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
             $OriginId = $obj.ObjectID
@@ -528,9 +536,10 @@ Function Compare-MimObjects {
                 foreach($mem in $resultComp){
                     $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $Mem.Value
                 }
-                Write-host "Different object properties found:"
-                Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
-                $difference.Add($newObj)
+                #Write-host "Different object properties found:"
+                #Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
+                $DifferenceCounter++
+                $difference.Add($newObj) | Out-Null
                 if ($newObj.psobject.properties.Name -contains "BoundAttributeType" -and 
                 $newObj.psobject.properties.Name -contains "BoundObjectType") { 
                     if ($bindingRefs -notcontains $RefToAttrSrc) {
@@ -545,6 +554,9 @@ Function Compare-MimObjects {
         }
     }
     if ($difference) {
+        Write-Host "Differences found!" -ForegroundColor Yellow
+        Write-Host "Found $NewObjCounter new $Type objects."
+        Write-Host "Found $DifferenceCounter different $Type objects."
         Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
@@ -600,7 +612,7 @@ Function Write-ToXmlFile {
         foreach($anch in $Anchor){
             $xmlElement = $XmlDoc.CreateElement("AnchorAttribute")
             $xmlElement.Set_InnerText($anch)
-            $XmlAnchors.AppendChild($xmlElement)
+            $XmlAnchors.AppendChild($xmlElement) | Out-Null
         }
         # Attributes of the object
         $xmlEle = $XmlDoc.CreateElement("AttributeOperations")

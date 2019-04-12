@@ -36,7 +36,7 @@ Describe "Start-Migration import" {
     } -ModuleName "IS4U.Migrate"
     Mock Start-Process -ModuleName "IS4U.Migrate"
     Mock Write-Host -ModuleName "IS4U.Migrate"
-    context "No parameters"{
+    context "With parameter All"{
         Start-Migration -All
         it "Correct path gets send"{
             Assert-MockCalled Compare-Schema -ParameterFilter {
