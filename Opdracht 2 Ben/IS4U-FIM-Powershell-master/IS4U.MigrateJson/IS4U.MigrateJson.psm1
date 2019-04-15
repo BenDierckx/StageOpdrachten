@@ -32,9 +32,8 @@ if(Get-Module -ListAvailible | Where-Object{$_Name -eq "LithnetRMA"}){
 
 <#
 To do:
-- installeren van Lithnet automatisch
 - Installeren van Wall automatisch
-- FimDelta geen duplicaten laten zien
+- Documentatie functies
 #>
 
 Function Start-MigrationJson {
@@ -265,6 +264,7 @@ Function Get-PolicyConfigToJson {
 
     $manPol = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
     $sets = Get-ObjectsFromConfig -ObjectType Set
+    $CustomSets = $null
     if ($xPathToSet) {
         $xPathToSet -replace '[/]', ''
         $CustomSets = Get-ObjectsFromConfig -ObjectType $xPathToSet
@@ -403,6 +403,17 @@ Function Compare-PortalJson {
 }
 
 Function Get-ObjectsFromConfig {
+    <#
+	.SYNOPSIS
+	Gets all objects from MIMConfig.
+
+	.DESCRIPTION
+    Gets all objects from MIMConfig. And writes them to a json file. 
+    Also filters out the illegalMembers (read only members). They are not needed for the import.
+
+	.EXAMPLE
+	Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+	#>
     param(
         [Parameter(Mandatory=$True)]
         [String]
@@ -602,8 +613,8 @@ Function Compare-Objects {
     }
     if ($difference) {
         Write-Host "Differences found!" -ForegroundColor Yellow
-        Write-Host "Found $NewObjCounter new $Type objects."
-        Write-Host "Found $DifferenceCounter different $Type objects."
+        Write-Host "Found $NewObjCounter new $Type objects." -ForegroundColor Yellow
+        Write-Host "Found $DifferenceCounter different $Type objects." -ForegroundColor Yellow
         Write-ToXmlFile -DifferenceObjects $difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green

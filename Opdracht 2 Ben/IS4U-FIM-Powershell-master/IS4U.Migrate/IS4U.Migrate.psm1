@@ -29,7 +29,6 @@ if(Get-Module -ListAvailable | Where-Object{$_.Name -eq "LithnetRMA"}){
 #endregion Lithnet
 <#
 To do:
-- FimDelta geen duplicaten laten zien
 - Documentatie functies
 #>
 Function Start-Migration {
@@ -332,6 +331,7 @@ Function Get-PolicyConfigToXml {
     )
     $mgmntPolicies = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
     $sets = Get-ObjectsFromConfig -ObjectType Set
+    $CustomSets = $null
     if ($xPathToSet) {
         $xPathToSet -replace '[/]', ''
         $CustomSets = Get-ObjectsFromConfig -ObjectType $xPathToSet
@@ -564,8 +564,8 @@ Function Compare-MimObjects {
     }
     if ($difference) {
         Write-Host "Differences found!" -ForegroundColor Yellow
-        Write-Host "Found $NewObjCounter new $Type objects."
-        Write-Host "Found $DifferenceCounter different $Type objects."
+        Write-Host "Found $NewObjCounter new $Type objects." -ForegroundColor Yellow
+        Write-Host "Found $DifferenceCounter different $Type objects." -ForegroundColor Yellow
         Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
