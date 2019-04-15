@@ -43,17 +43,17 @@ Function Start-MigrationJson {
     or importing a setup in a different target MIM-Setup.
     
     .DESCRIPTION
-    Call Start-MigrationJson from the IS4U.MigrateJson folder! 
+    Call Start-MigrationJson and Export-MIMSetupToJson from the IS4U.MigrateJson folder! 
     The source MIM-Setup json files are acquired by calling Export-MIMConfig in the source environment.
     Start-MigrationJson will serialize the target MIM setup resources to json and deserialize them
     so they can be compared with the resources from the source json files.
     The differences that are found are writen to a Lithnet-format xml file, called ConfigurationDelta.xml.
-    When ImportDelta is True or Start-MigrationJson is called without parameters, the FimDelta.exe program is 
+    When Start-Migration is called with -ImportDelta or -All, the FimDelta.exe program is 
     called and the user can choose which resources get imported from the configuration delta.
     The final (or total) configuration then gets imported in the target MIM-Setup.  
     
     .PARAMETER ImportDelta
-    When Start-MigrationJson is called with a parameter no import will be executed. To ensure the differences get
+    When Start-Migration is called with a parameter other then -All no import will be executed. To ensure the differences get
     imported in the target MIM-Setup call 'Start-Migration -ImportDelta'. This will use the created ConfigurationDelta.xml
     from the chosen configurations, give the user the choice what will get imported and import them.
 
@@ -112,12 +112,13 @@ Function Start-MigrationJson {
         return
     }
     if ($CompareSchema -or $ComparePolicy -or $ComparePortal -or $ImportDelta) {
-        $ImportAllConfigurations = $False
+        $All = $False
     }
-    if ($ImportAllConfigurations) {
+    if ($All) {
         Compare-SchemaJson -path $path
         Compare-PortalJson -path $path
         Compare-PolicyJson -path $path
+        $ImportDelta = $True
     } else {
         if ($CompareSchema) {
             Compare-SchemaJson -path $path
@@ -197,6 +198,14 @@ Function Export-MIMSetupToJson {
 }
 
 Function Get-SchemaConfigToJson {
+    <#
+    .SYNOPSIS
+    Collect Schema resources from the MIM-Setup and writes them to a json file in json format.
+    
+    .DESCRIPTION
+    Collect Schema resources from the MIM-Setup and writes them to a json file in json format.
+    These json files are used at the target MIM-Setup for importing the differences.
+    #>
     param(
         [Parameter(Mandatory=$False)]
         [Bool]
@@ -215,6 +224,19 @@ Function Get-SchemaConfigToJson {
 }
 
 Function Compare-SchemaJson {
+    <#
+    .SYNOPSIS
+    Get the Schema resources from both the source and target MIM-Setup (by Get-ObjectsFromJson or Get-ObjectsFromConfig).
+    Send the found resources to Compare-MimObjects.
+    
+    .DESCRIPTION
+    Gets the Schema resources from the source (Get-ObjectsFromJson) and target MIM-Setup (Get-ObjectsFromConfig). 
+    Each object type in the Schema configuration calls (if found) the function Compare-MimObjects using the found objects of
+    the corresponding object type.
+    
+    .PARAMETER Path
+    Path to where ConfigurationDelta.xml will be saved.
+    #>
     param(
         [Parameter(Mandatory=$True)]
         [String]
@@ -256,6 +278,17 @@ Function Compare-SchemaJson {
 }
 
 Function Get-PolicyConfigToJson {
+    <#
+    .SYNOPSIS
+    Collect Policy resources from the MIM-Setup and writes them to a json file in json format.
+    
+    .DESCRIPTION
+    Collect Policy resources from the MIM-Setup and writes them to a json file in json format.
+    These json files are used at the target MIM-Setup for importing the differences.
+    
+    .PARAMETER xPathToSet
+    Xpath to a custom Set object in the MIM-Setup
+    #>
     param(
         [Parameter(Mandatory=$False)]
         [String]
@@ -294,6 +327,19 @@ Function Get-PolicyConfigToJson {
 }
 
 Function Compare-PolicyJson {
+    <#
+    .SYNOPSIS
+    Get the Policy resources from both the source and target MIM-Setup (by Get-ObjectsFromJson or Get-ObjectsFromConfig).
+    Send the found resources to Compare-MimObjects.
+    
+    .DESCRIPTION
+    Gets the Policy resources from the source (Get-ObjectsFromJson) and target MIM-Setup (Get-ObjectsFromConfig). 
+    Each object type in the Policy configuration calls (if found) the function Compare-MimObjects using the found objects of
+    the corresponding object type.
+    
+    .PARAMETER Path
+    Path to where ConfigurationDelta.xml will be saved.
+    #>
     param(
         [Parameter(Mandatory=$True)]
         [String]
@@ -343,6 +389,14 @@ Function Compare-PolicyJson {
 }
 
 Function Get-PortalConfigToJson {
+    <#
+    .SYNOPSIS
+    Collect Portal resources from the MIM-Setup and writes them to a json file in json format.
+    
+    .DESCRIPTION
+    Collect Portal resources from the MIM-Setup and writes them to a json file in json format.
+    These json files are used at the target MIM-Setup for importing the differences.
+    #>
     param(
         [Parameter(Mandatory=$False)]
         [Bool]
@@ -367,6 +421,19 @@ Function Get-PortalConfigToJson {
 }
 
 Function Compare-PortalJson {
+    <#
+    .SYNOPSIS
+    Get the Portal resources from both the source and target MIM-Setup (by Get-ObjectsFromJson or Get-ObjectsFromConfig).
+    Send the found resources to Compare-MimObjects.
+    
+    .DESCRIPTION
+    Gets the Portal resources from the source (Get-ObjectsFromJson) and target MIM-Setup (Get-ObjectsFromConfig). 
+    Each object type in the Portal configuration calls (if found) the function Compare-MimObjects using the found objects of
+    the corresponding object type.
+    
+    .PARAMETER Path
+    Path to where ConfigurationDelta.xml will be saved.
+    #>
     param(
         [Parameter(Mandatory=$True)]
         [String]
@@ -404,16 +471,22 @@ Function Compare-PortalJson {
 
 Function Get-ObjectsFromConfig {
     <#
-	.SYNOPSIS
-	Gets all objects from MIMConfig.
-
-	.DESCRIPTION
-    Gets all objects from MIMConfig. And writes them to a json file. 
-    Also filters out the illegalMembers (read only members). They are not needed for the import.
-
-	.EXAMPLE
-	Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
-	#>
+    .SYNOPSIS
+    Gets the resources from the MIM-Setup that correspond to the given object type, serialize and
+    deserialize these resources and return them.
+    
+    .DESCRIPTION
+    Gets the resources from the MIM-Setup that correspond to the given object type.
+    The read-only members of the resources get stripped as they can not be imported in a target MIM-Setup.
+    The updated resources then get serialized and deserialized so that they are the same when comparing.
+    The final resources are then returned.
+    
+    .PARAMETER ObjectType
+    Object type of a type of resource in the MIM-Setup.
+    
+    .EXAMPLE
+    Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
+    #>
     param(
         [Parameter(Mandatory=$True)]
         [String]
@@ -434,12 +507,19 @@ Function Get-ObjectsFromConfig {
         $updatedObjs = ConvertTo-Json -InputObject $objects -Depth 4
         $objects = ConvertFrom-Json -InputObject $updatedObjs
     } else {
-        Write-Host "No objects found to write to json"
+        Write-Host "No $ObjectType found to write to json"
     }
     return $objects
 }
 
 Function Convert-ToJson {
+    <#
+    .SYNOPSIS
+    Converts objects to a json file using the json format.
+    
+    .DESCRIPTION
+    Converts objects to a json file using the json format.
+    #>
     param(
         [Parameter(Mandatory=$False)]
         [Array]
@@ -460,6 +540,17 @@ Function Convert-ToJson {
 }
 
 Function Get-ObjectsFromJson {
+    <#
+    .SYNOPSIS
+    Retrieve resources from a json file.
+    
+    .DESCRIPTION
+    Retrieve resources from a json file that has been created by Export-MimConfigToJson. This file contains
+    resources from a MIM-Setup that have been serialized and deserialized by using the json format.
+    
+    .EXAMPLE
+    Get-ObjectsFromJson -JsonFilePath "ConfigPortalUI.json"
+    #>
     param(
         [Parameter(Mandatory=$True)]
         [String]
@@ -475,6 +566,35 @@ Function Get-ObjectsFromJson {
 }
 
 Function Compare-Objects {
+    <#
+    .SYNOPSIS
+    Compares two arrays of MIM object type resources and sends the differences to Write-ToXmlFile
+    
+    .DESCRIPTION
+    Compares two arrays containing resources from source and target MIM-Setups. The objects that are references from other objects
+    get added immediatly without comparing for differences (these are needed for references in xml). 
+    Counters keep track of the found differences and new objects and give a summary to the user.
+    The final differences from new objects, different objects and referentials are send to Write-ToXmlFile to create
+    a delta configuration file used for importing.
+    
+    .PARAMETER ObjsSource
+    Resources from the source MIM-Setup. These objects are the ones that are imported if they are not found or different
+    against the target MIM-Setup.
+    
+    .PARAMETER ObjsDestination
+    Resources from the target MIM-Setup. These are used to find differences between the two resource arrays.
+    
+    .PARAMETER Anchor
+    An anchor to uniquely identify objects. This parameter is also used for the delta configuration file as the anchor in the 
+    xml structure.
+    
+    .PARAMETER path
+    Path to where ConfigurationDelta.xml will be saved.
+    
+    .NOTES
+    This compare function has been designed to compare objects in an array that follow a structure that is used in a MIM-Setup.
+    When comparing objects that do not have this design, the compare can crash.
+    #>
     param (
         [Parameter(Mandatory=$True)]
         [array]
@@ -622,6 +742,25 @@ Function Compare-Objects {
 }
 
 Function Write-ToXmlFile {
+    <#
+    .SYNOPSIS
+    Writes an array of objects to a Lithnet format xml file.
+    
+    .DESCRIPTION
+    Writes the given array of objects to a xml file using a Lithnet format that Import-RmConfig can read and import.
+    ObjectID's from the resources are used as xml-references in the xml file. When more references are found, the
+    referenced objects are added to the global variable bindings. Objects from the variable bindings are written to the same
+    xml file used in this function so that references can be found.
+    
+    .PARAMETER DifferenceObjects
+    Array of found resources that are different, new or referenced to
+    
+    .PARAMETER path
+    Path to where ConfigurationDelta.xml will be saved.
+    
+    .PARAMETER Anchor
+    Anchor used for uniquely identifying objects.
+    #>
     param (
         [Parameter(Mandatory=$True)]
         [System.Collections.ArrayList]
@@ -783,5 +922,6 @@ Function Import-Delta {
         [string]
         $DeltaConfigFilePath
     )
-        Import-RMConfig $DeltaConfigFilePath -Preview -Verbose
+        # When Preview is enabled this will not import the configuration but give a preview
+        Import-RMConfig $DeltaConfigFilePath -Verbose #-Preview
 }
