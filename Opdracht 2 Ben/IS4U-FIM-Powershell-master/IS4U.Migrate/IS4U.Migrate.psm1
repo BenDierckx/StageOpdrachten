@@ -16,17 +16,21 @@ here: http://opensource.org/licenses/gpl-3.0.
 Set-StrictMode -Version Latest
 
 #region Lithnet
-if(!(Get-Module -Name LithnetRMA))
-{
-Import-Module LithnetRMA;
+if(Get-Module -ListAvailable | Where-Object{$_.Name -eq "LithnetRMA"}){
+    if(!(Get-Module -Name LithnetRMA)) {
+        Import-Module LithnetRMA
+    }
+} else {
+    $ExePath = $PSScriptRoot
+    Start-Process -FilePath "$ExePath\Lithnet.ResourceManagement.Automation.msi"
+    Import-Module LithnetRMA
 }
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 <#
 To do:
-- installeren van Lithnet automatisch
-- Installeren van Wall automatisch
 - FimDelta geen duplicaten laten zien
+- Documentatie functies
 #>
 Function Start-Migration {
     <#
@@ -95,6 +99,9 @@ Function Start-Migration {
     SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
     $global:bindingRefs = [System.Collections.ArrayList] @()
     $path = Select-FolderDialog
+    if (!$path) {
+        return
+    }
     if ($CompareSchema -or $ComparePolicy -or $ComparePortal -or $ImportDelta) {
         $All = $False
     }
@@ -392,14 +399,14 @@ function Get-ObjectsFromConfig {
         Write-ToCliXml -Objects $objects -xmlName Temp   
         $objects = Import-Clixml "ConfigTemp.xml"
     } else {
-        Write-Host "No objects found to write to clixml!"
+        Write-Host "No $ObjectType objects found to write to clixml!"
     }
     return $objects
 }
 
 Function Write-ToCliXml {
     param(
-        [Parameter(Mandatory=$True)]
+        [Parameter(Mandatory=$False)]
         [Array]
         $Objects,
 
@@ -407,7 +414,9 @@ Function Write-ToCliXml {
         [String]
         $xmlName
     )
-    Export-Clixml -InputObject $Objects -Path "Config$xmlName.xml" -Depth 4 
+    if($Objects){
+        Export-Clixml -InputObject $Objects -Path "Config$xmlName.xml" -Depth 4 
+    }
 }
 
 Function Get-ObjectsFromXml {
@@ -700,7 +709,7 @@ Function Select-FolderDialog{
     If ($Show -eq "OK") {
         Return $objForm.SelectedPath
     } Else {
-        Write-Error "Operation cancelled by user." -ErrorAction Stop
+        Write-Host "Operation cancelled by user." -ForegroundColor Red
     }
 }
 

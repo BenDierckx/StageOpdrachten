@@ -16,9 +16,17 @@ here: http://opensource.org/licenses/gpl-3.0.
 Set-StrictMode -Version Latest
 
 #region Lithnet
-if(!(Get-Module -Name LithnetRMA)) {
-    Import-Module LithnetRMA;
+if(Get-Module -ListAvailible | Where-Object{$_Name -eq "LithnetRMA"}){
+    if(!(Get-Module -Name LithnetRMA)) {
+        Import-Module LithnetRMA
+    }
+    else {
+        $ExePath = $PSScriptRoot
+        Start-Process -FilePath "$ExePath\Lithnet.ResourceManagement.Automation.msi"
+        Import-Module LithnetRMA
+    }
 }
+
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 
@@ -101,6 +109,9 @@ Function Start-MigrationJson {
     SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
     $Global:bindings = [System.Collections.ArrayList] @()
     $path = Select-FolderDialog
+    if (!$path) {
+        return
+    }
     if ($CompareSchema -or $ComparePolicy -or $ComparePortal -or $ImportDelta) {
         $ImportAllConfigurations = $False
     }
@@ -419,7 +430,7 @@ Function Get-ObjectsFromConfig {
 
 Function Convert-ToJson {
     param(
-        [Parameter(Mandatory=$True)]
+        [Parameter(Mandatory=$False)]
         [Array]
         $Objects,
 
@@ -427,12 +438,14 @@ Function Convert-ToJson {
         [String]
         $JsonName
     )
-
-    foreach ($obj in $objects) {
-        $objMembers = $obj.psobject.members | Where-Object membertype -Like 'noteproperty'
-        $obj = $objMembers
+    
+    if($Objects) {
+        foreach ($obj in $objects) {
+            $objMembers = $obj.psobject.members | Where-Object membertype -Like 'noteproperty'
+            $obj = $objMembers
+        }
+        ConvertTo-Json -InputObject $Objects -Depth 4 -Compress | Out-File "./Config$JsonName.json"
     }
-    ConvertTo-Json -InputObject $Objects -Depth 4 -Compress | Out-File "./Config$JsonName.json"
 }
 
 Function Get-ObjectsFromJson {
@@ -734,7 +747,7 @@ Function Select-FolderDialog{
     If ($Show -eq "OK") {
         Return $objForm.SelectedPath
     } Else {
-        Write-Error "Operation cancelled by user." -ErrorAction Stop
+        Write-Host "Operation cancelled by user." -ForegroundColor Red
     }
 }
 
