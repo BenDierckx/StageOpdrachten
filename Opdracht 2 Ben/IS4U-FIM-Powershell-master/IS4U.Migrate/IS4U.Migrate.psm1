@@ -86,15 +86,15 @@ Function Start-Migration {
         $ImportDelta
     )
     if (!($All.IsPresent -or $CompareSchema.IsPresent -or $ComparePolicy.IsPresent -or $ComparePortal.IsPresent -or $ImportDelta.IsPresent)) {
-        Write-Host "Use flag with Start-Migration (-All, -CompareSchema, -ComparePolicy, -ComparePortal or -ImportDelta)" -ForegroundColor Red
+        Write-Host "Use Start-Migration with flag(s) (-All, -CompareSchema, -ComparePolicy, -ComparePortal or -ImportDelta)" -ForegroundColor Red
         return
     }
-    $ExePath = $PSScriptRoot
+    #$ExePath = $PSScriptRoot
     # ReferentialList to store Objects and Attributes in memory for reference of bindings
     $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList] @();
     SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
     $global:bindingRefs = [System.Collections.ArrayList] @()
-    $path = Select-FolderDialog
+    $path = Select-FolderDialog -Message "Select folder to save the ConfigurationDelta.xml"
     if (!$path) {
         return
     }
@@ -137,8 +137,9 @@ Function Start-Migration {
         Remove-Variable bindingRefs -Scope Global
         if (Test-Path -Path "$Path\ConfigurationDelta.xml") {
             Write-Host "Select objects to be imported."
-            $exeFile = "$ExePath\FimDelta.exe"
-            Start-Process $exeFile "$Path\ConfigurationDelta.xml" -Wait
+            #$exeFile = "$ExePath\FimDelta.exe"
+            Start-FimDelta -Path $Path
+            #Start-Process $exeFile "$Path\ConfigurationDelta.xml" -Wait
             if (Test-Path -Path "$Path\ConfigurationDelta2.xml") {
                 Import-Delta -DeltaConfigFilePath "$path\ConfigurationDelta2.xml"
             } else {
@@ -162,7 +163,7 @@ Function Export-MIMSetupToXml {
 
     .Parameter XpathToSet
     Give the xpath to a custom Set object. This will be created in a seperate xml file to be 
-    imported in the target MIM-Setup
+    imported in the target MIM-Setup.
     #>
     param(
         [Parameter(Mandatory=$False)]
@@ -180,6 +181,36 @@ Function Export-MIMSetupToXml {
         Get-PolicyConfigToXml -xPathToSet $XpathToSet
     } else {
         Write-Host "Export cancelled."
+    }
+}
+
+Function Start-FimDelta {
+    <#
+    .SYNOPSIS
+    Start the FimDelta application to select which objects are saved to ConfigurationDelta2.xml
+    
+    .DESCRIPTION
+    Starts the FimDelta application where the user can choose which resources are to be saved to the
+    ConfigurationDelta2.xml. These resources are created after a compare between two configurations and is called
+    ConfigurationDelta.xml. The ConfigurationDelta2.xml if created is used for Import-Delta, to import all the chosen resources.
+    When nothing is saved to ConfigurationDelta2.xml, the ConfigurationDelta.xml is used instead.
+    
+    .PARAMETER Path
+    Path to where ConfigurationDelta.xml is currently saved.
+    #>
+    param(
+        [Parameter(Mandatory=$False)]
+        [String]
+        $Path  
+    )
+    if(!$Path) {
+        $Path = Select-FolderDialog -Message "Select the folder where the ConfigurationDelta.xml is saved!"
+    }
+    $ExePath = "$PSScriptRoot\FimDelta.exe"
+    if(Test-Path -Path "$Path\ConfigurationDelta.xml"){
+        Start-Process $exeFile "$Path\ConfigurationDelta.xml" -Wait
+    } else {
+        Write-Host "No ConfigurationDelta.xml file found, try again and select the correct folder."
     }
 }
 
@@ -495,6 +526,9 @@ Function Write-ToCliXml {
     
     .DESCRIPTION
     Writes objects to a xml file using the CliXml format.
+
+    .Parameter xmlName
+    Give the name of the xml file. The name will be placed between 'Config' and '.xml'.
     #>
     
     param(
@@ -854,11 +888,16 @@ Function Select-FolderDialog{
     .LINK
     https://stackoverflow.com/questions/11412617/get-a-folder-path-from-the-explorer-menu-to-a-powershell-variable
     #>
+    param(
+        [Parameter(Mandatory=$True)]
+        [string]
+        $Message
+    )
     [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null     
 
     $objForm = New-Object System.Windows.Forms.FolderBrowserDialog
     $objForm.Rootfolder = "Desktop"
-    $objForm.Description = "Select folder to save the ConfigurationDelta.xml"
+    $objForm.Description = $Message
     $Show = $objForm.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost = $true }))
     If ($Show -eq "OK") {
         Return $objForm.SelectedPath
@@ -874,10 +913,10 @@ Function Import-Delta {
     
     .DESCRIPTION
     Import the differences between the source MIM setup and the target MIM setup in the target 
-    MIM setup using a delta in xml
+    MIM setup using a delta in xml.
     
     .PARAMETER DeltaConfigFilePath
-    The path to a delta of a configuration in a xml file
+    The path to a delta of a configuration in a xml file (ConfigurationDelta.xml or ConfigurationDelta2.xml).
     #>
     param (
         [Parameter(Mandatory=$True)]
