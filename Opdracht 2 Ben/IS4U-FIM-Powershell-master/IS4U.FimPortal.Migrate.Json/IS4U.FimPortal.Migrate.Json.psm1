@@ -16,8 +16,8 @@ here: http://opensource.org/licenses/gpl-3.0.
 Set-StrictMode -Version Latest
 
 #region Lithnet
-if(Get-Module -ListAvailible | Where-Object{$_Name -eq "LithnetRMA"}){
-    if(!(Get-Module -Name LithnetRMA)) {
+if (Get-Module -ListAvailible | Where-Object{$_Name -eq "LithnetRMA"}){
+    if (!(Get-Module -Name LithnetRMA)) {
         Import-Module LithnetRMA
     }
     else {
@@ -33,17 +33,18 @@ if(Get-Module -ListAvailible | Where-Object{$_Name -eq "LithnetRMA"}){
 <#
 To do:
 - Installeren van Wall automatisch
-- Documentatie functies
 #>
+$Global:path = ""
+$Global:PathToConfig = ""
 
-Function Start-MigrationJson {
+Function Start-Migration {
     <#
     .SYNOPSIS
     Starts the migration of a MIM-Setup by either comparing certain configurations
     or importing a setup in a different target MIM-Setup.
     
     .DESCRIPTION
-    Call Start-MigrationJson and Export-MIMSetupToJson from the IS4U.MigrateJson folder! 
+    Call Start-Migration and Export-MIMSetup from the IS4U.MigrateJson folder! 
     The source MIM-Setup json files are acquired by calling Export-MIMConfig in the source environment.
     Start-MigrationJson will serialize the target MIM setup resources to json and deserialize them
     so they can be compared with the resources from the source json files.
@@ -63,13 +64,13 @@ Function Start-MigrationJson {
     configurations where the parameters are set to True, in this case the Schema configuration.
     
     .EXAMPLE
-    Start-MigrationJson -All
-    Start-MigrationJson -CompareSchema
-    Start-MigrationJson -ImportDelta
+    Start-Migration -All
+    Start-Migration -CompareSchema
+    Start-Migration -ImportDelta
 
     .Notes
     IMPORTANT:
-    This module has been designed to only use Start-MigrationJson and Export-MIMSetupToJson functions.
+    This module has been designed to only use Start-MigrationJson and Export-MIMSetup functions.
     When other functions are called there is no guarantee the desired effect will be accomplished.
     #>
     param(
@@ -92,12 +93,51 @@ Function Start-MigrationJson {
 
         [Parameter(Mandatory=$False)]
         [Switch]
-        $ImportDelta = $False
-    )
+        $ImportDelta = $False,
 
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathForDelta,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathToConfigFiles
+    )
     if (!($All.IsPresent -or $CompareSchema.IsPresent -or $ComparePolicy.IsPresent -or $ComparePortal.IsPresent -or $ImportDelta.IsPresent)) {
         Write-Host "Use Start-Migration with flag(s) (-All, -CompareSchema, -ComparePolicy, -ComparePortal or -ImportDelta)" -ForegroundColor Red
         return
+    }
+    if ($PathToConfigFiles) {
+        if (Test-Path -path $PathToConfigFiles) {
+            $Global:PathToConfig = $PathToConfigFiles
+        } else {
+            Write-Host "$PathToConfigFiles was not found!" -ForegroundColor Red
+            $Global:PathToConfig = Select-FolderDialog -Message "Select folder where Development Config files are stored"
+            if (!$PathToConfig) {
+                return
+            }
+        }
+    } elseif(!$PathToConfig) {
+        $Global:PathToConfig = Select-FolderDialog -Message "Select folder where Development Config files are stored"
+        if(!$PathToConfig) {
+            return
+        }
+    }
+    if ($PathForDelta) {
+        if (Test-Path -path $PathForDelta) {
+            $Global:path = $PathForDelta
+        } else {
+            Write-Host "No $PathForDelta path found!" -ForegroundColor Red
+            $Global:path = Select-FolderDialog -Message "Select folder where the ConfigurationDelta.xml will be saved"
+            if (!$PathForDelta) {
+                return
+            }
+        }
+    } elseif (!$path) {
+        $Global:path = Select-FolderDialog "Select folder to save the ConfigurationDelta.xml"
+        if (!$path) {
+            return
+        }
     }
     # Force the path for the ExePath to IS4U.MigrateJson
     #$ExePath = $PSScriptRoot
@@ -105,22 +145,17 @@ Function Start-MigrationJson {
     $Global:ReferentialList = @{SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@() 
     SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList]@();}
     $Global:bindings = [System.Collections.ArrayList] @()
-    #Set-Location $ExePath
-    $path = Select-FolderDialog -Message "Select folder to save the ConfigurationDelta.xml"
-    if (!$path) {
-        return
-    }
     if ($CompareSchema -or $ComparePolicy -or $ComparePortal -or $ImportDelta) {
         $All = $False
     }
     if ($All) {
-        Compare-SchemaJson -path $path
-        Compare-PortalJson -path $path
-        Compare-PolicyJson -path $path
-        $ImportDelta = $True
+        Compare-Schema -path $path -PathToConfig $PathToConfig
+        Compare-Policy -path $path -PathToConfig $PathToConfig
+        Compare-Portal -path $path -PathToConfig $PathToConfig
+        #$ImportDelta = $True
     } else {
         if ($CompareSchema) {
-            Compare-SchemaJson -path $path
+            Compare-Schema -path $path -PathToConfig $PathToConfig
         }
         if ($ComparePolicy) {
             $attrsSource = Get-ObjectsFromJson -XmlFilePath "ConfigAttributes.json"
@@ -135,10 +170,10 @@ Function Start-MigrationJson {
                     $Global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
                 }
             }
-            Compare-PolicyJson -path $path
+            Compare-Policy -path $path -PathToConfig $PathToConfig
         }
         if ($ComparePortal) {
-            Compare-PortalJson -path $path
+            Compare-Portal -path $path -PathToConfig $PathToConfig
         }
         }
     if ($bindings) {
@@ -161,10 +196,12 @@ Function Start-MigrationJson {
         } else {
             Write-Host "No configurationDelta file found: Not created or no differences."
         }
+        Remove-Variable path -Scope Global
+        Remove-Variable PathToConfig -Scope Global
     }
 }
 
-Function Export-MIMSetupToJson {
+Function Export-MIMSetup {
     <#
     .SYNOPSIS
     Export the source resources from a MIM-Setup to json files in a json format.
@@ -180,21 +217,63 @@ Function Export-MIMSetupToJson {
     #>
     param(
         [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportAll,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportSchema,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportPolicy,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportPortal,
+
+        [Parameter(Mandatory=$False)]
         [String]
-        $XpathToSet
+        $XpathToSet,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathToExport
     )
-    Write-Host "Starting export of current MIM configuration to json files. (This will overwrite existing MIM-config json files!)"
-    $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
-    while ($conf -notmatch "[y/Y/n/N]") {
-        $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+    if (!($ExportAll.IsPresent -or $ExportSchema.IsPresent -or $ExportPolicy.IsPresent -or $ExportPortal.IsPresent)) {
+        Write-Host "Use Export-MIMSetup with flag(s) (-All, -ExportSchema, -ExportPolicy, -ExportPortal)" -ForegroundColor Red
+        return
     }
-    if ($conf.ToLower() -eq "y"){
-        Get-SchemaConfigToJson
-        Get-PortalConfigToJson
-        Get-PolicyConfigToJson -xPathToSet $XpathToSet
+    if (Test-Path -path $PathToExport) {
+        if ($PathToExport) {
+            $Global:PathToConfig = $PathToExport
+        } else {
+            Write-Host "$PathToExport folder does not exist. Choose a valid folder!" -ForegroundColor Red
+            $Global:PathToConfig = Select-FolderDialog -Message "Select the folder where export files are saved" | Out-Null
+        }
     } else {
-        Write-Host "Export cancelled."
+        $DefaultPath = [environment]::GetFolderPath("MyDocuments")
+        $Global:PathToConfig = $DefaultPath
     }
+    Write-Host "Starting export of the MIM configuration to json files."
+    if ($ExportAll) {
+        Get-SchemaConfig
+        Get-PolicyConfig -xPathToSet $XpathToSet
+        Get-PortalConfig
+    }
+    if ($ExportSchema) {
+        Get-SchemaConfig
+    }
+    if ($ExportPolicy) {
+        Get-SchemaConfig
+        Get-PolicyConfig -xPathToSet $XpathToSet
+    }
+    if ($ExportPortal) {
+        Get-SchemaConfig
+        Get-PortalConfig
+    }
+    Write-Host "Export saved towards $PathToConfig!" -ForegroundColor Green
+    Remove-Variable path -Scope Global
 }
 
 Function Start-FimDelta {
@@ -220,16 +299,16 @@ Function Start-FimDelta {
     if(!$Path) {
         $Path = Select-FolderDialog -Message "Select the folder where the ConfigurationDelta.xml is saved"
     }
-    $ExePath = "$PSScriptRoot\FimDelta.exe"
+    $ExeFile = "$PSScriptRoot\FimDelta.exe"
     if(Test-Path -Path "$Path\ConfigurationDelta.xml") {
-        Start-Process $exeFile "$Path\ConfigurationDelta.xml" -Wait
+        Start-Process $ExeFile "$Path\ConfigurationDelta.xml" -Wait
     }
     else {
         Write-Host "No ConfigurationDelta.xml file was found in this location, try again select the correct location!"
     }
 }
 
-Function Get-SchemaConfigToJson {
+Function Get-SchemaConfig {
     <#
     .SYNOPSIS
     Collect Schema resources from the MIM-Setup and writes them to a json file in json format.
@@ -255,7 +334,7 @@ Function Get-SchemaConfigToJson {
     Convert-ToJson -Objects $constSpec -JsonName ConstantSpecifiers
 }
 
-Function Compare-SchemaJson {
+Function Compare-Schema {
     <#
     .SYNOPSIS
     Get the Schema resources from both the source and target MIM-Setup (by Get-ObjectsFromJson or Get-ObjectsFromConfig).
@@ -272,20 +351,24 @@ Function Compare-SchemaJson {
     param(
         [Parameter(Mandatory=$True)]
         [String]
-        $path
+        $path,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathToConfig
     )
     Write-Host "Starting compare of Schema configuration..."
     # Source of objects to be imported
-    $attrsSource = Get-ObjectsFromJson -JsonFilePath "ConfigAttributes.json"
+    $attrsSource = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigAttributes.json"
     foreach($obj in $attrsSource) {
         $Global:ReferentialList.SourceRefAttrs.Add($obj) | Out-Null
     }
-    $objsSource = Get-ObjectsFromJson -JsonFilePath "ConfigObjectTypes.json"
+    $objsSource = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigObjectTypes.json"
     foreach($obj in $objsSource) {
         $Global:ReferentialList.SourceRefObjs.Add($obj) | Out-Null
     }
-    $bindingsSource = Get-ObjectsFromJson -JsonFilePath "ConfigBindings.json"
-    $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "ConfigConstantSpecifiers.json"
+    $bindingsSource = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigBindings.json"
+    $constSpecsSource = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigConstantSpecifiers.json"
     
     # Target Setup objects, comparing purposes
     # Makes target a json and then converts it to an object
@@ -309,7 +392,7 @@ Function Compare-SchemaJson {
     Write-Host "Compare of Schema configuration completed."
 }
 
-Function Get-PolicyConfigToJson {
+Function Get-PolicyConfig {
     <#
     .SYNOPSIS
     Collect Policy resources from the MIM-Setup and writes them to a json file in json format.
@@ -358,7 +441,7 @@ Function Get-PolicyConfigToJson {
     Convert-ToJson -Objects $syncFilter -JsonName SynchronizationFilters
 }
 
-Function Compare-PolicyJson {
+Function Compare-Policy {
     <#
     .SYNOPSIS
     Get the Policy resources from both the source and target MIM-Setup (by Get-ObjectsFromJson or Get-ObjectsFromConfig).
@@ -375,23 +458,27 @@ Function Compare-PolicyJson {
     param(
         [Parameter(Mandatory=$True)]
         [String]
-        $path
+        $path,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathToConfig
     )
     Write-Host "Starting compare of Policy configuration..."
     # Source of objects to be imported
-    $mgmntPlciesSrc = Get-ObjectsFromJson -JsonFilePath "ConfigManagementPolicyRules.json"
-    $setsSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSets.json"
+    $mgmntPlciesSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigManagementPolicyRules.json"
+    $setsSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigSets.json"
     if (Test-Path("ConfigCustomSets.xml")) {
-        $CustomSetsSrc = Get-ObjectsFromJson -JsonFilePath "ConfigCustomSets.json"
+        $CustomSetsSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigCustomSets.json"
         Write-ToXmlFile -DifferenceObjects $CustomSetsSrc -path $Path -Anchor @("DisplayName")
     }
-    $workflowSrc = Get-ObjectsFromJson -JsonFilePath "ConfigWorkflowDefinitions.json"
-    $emailSrc = Get-ObjectsFromJson -JsonFilePath "ConfigEmailTemplates.json"
-    $filtersSrc = Get-ObjectsFromJson -JsonFilePath "ConfigFilterScopes.json"
-    $activitySrc = Get-ObjectsFromJson -JsonFilePath "ConfigActivityInformationConfigurations.json"
-    $funcSrc = Get-ObjectsFromJson -JsonFilePath "ConfigFunctions.json"
-    $syncRSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSynchronizationRules.json"
-    $syncFSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSynchronizationFilters.json"
+    $workflowSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigWorkflowDefinitions.json"
+    $emailSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigEmailTemplates.json"
+    $filtersSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigFilterScopes.json"
+    $activitySrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigActivityInformationConfigurations.json"
+    $funcSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigFunctions.json"
+    $syncRSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigSynchronizationRules.json"
+    $syncFSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigSynchronizationFilters.json"
 
     # Target Setup objects, comparing purposes
     $mgmntPlciesDest = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
@@ -420,7 +507,7 @@ Function Compare-PolicyJson {
     Write-Host "Compare of Policy configuration completed."
 }
 
-Function Get-PortalConfigToJson {
+Function Get-PortalConfig {
     <#
     .SYNOPSIS
     Collect Portal resources from the MIM-Setup and writes them to a json file in json format.
@@ -452,7 +539,7 @@ Function Get-PortalConfigToJson {
     Convert-ToJson -Objects $objectVisualConf -JsonName ObjectVisualizationConfigurations
 }
 
-Function Compare-PortalJson {
+Function Compare-Portal {
     <#
     .SYNOPSIS
     Get the Portal resources from both the source and target MIM-Setup (by Get-ObjectsFromJson or Get-ObjectsFromConfig).
@@ -469,16 +556,20 @@ Function Compare-PortalJson {
     param(
         [Parameter(Mandatory=$True)]
         [String]
-        $path
+        $path,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathToConfig
     )
     Write-Host "Starting compare of Portal configuration..."
     # Source of objects to be imported
-    $UISrc = Get-ObjectsFromJson -JsonFilePath "ConfigPortalUIConfigurations.json"
-    $navSrc = Get-ObjectsFromJson -JsonFilePath "ConfigNavigationBarConfigurations.json"
-    $srchScopeSrc = Get-ObjectsFromJson -JsonFilePath "ConfigSearchScopeConfigurations.json"
-    $objVisSrc = Get-ObjectsFromJson -JsonFilePath "ConfigObjectVisualizationConfigurations.json"
-    $homePSrc = Get-ObjectsFromJson -JsonFilePath "ConfigHomepageConfigurations.json"
-    $confSrc = Get-ObjectsFromJson -JsonFilePath "ConfigConfigurations.json"
+    $UISrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigPortalUIConfigurations.json"
+    $navSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigNavigationBarConfigurations.json"
+    $srchScopeSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigSearchScopeConfigurations.json"
+    $objVisSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigObjectVisualizationConfigurations.json"
+    $homePSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigHomepageConfigurations.json"
+    $confSrc = Get-ObjectsFromJson -JsonFilePath "$PathToConfig\ConfigConfigurations.json"
 
     # Target Setup objects, comparing purposes
     $UIDest = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
@@ -566,11 +657,14 @@ Function Convert-ToJson {
     )
     
     if($Objects) {
-        foreach ($obj in $objects) {
-            $objMembers = $obj.psobject.members | Where-Object membertype -Like 'noteproperty'
-            $obj = $objMembers
+        if (Test-Path -path "$path\MIMExportFiles") {
+            foreach ($obj in $objects) {
+                $objMembers = $obj.psobject.members | Where-Object membertype -Like 'noteproperty'
+                $obj = $objMembers
+            }
+        } else {
+            ConvertTo-Json -InputObject $Objects -Depth 4 -Compress | Out-File "$PathToConfig\Config$JsonName.json"
         }
-        ConvertTo-Json -InputObject $Objects -Depth 4 -Compress | Out-File "./Config$JsonName.json"
     }
 }
 
@@ -580,7 +674,7 @@ Function Get-ObjectsFromJson {
     Retrieve resources from a json file.
     
     .DESCRIPTION
-    Retrieve resources from a json file that has been created by Export-MimConfigToJson. This file contains
+    Retrieve resources from a json file that has been created by Export-MimConfig. This file contains
     resources from a MIM-Setup that have been serialized and deserialized by using the json format.
     
     .EXAMPLE
@@ -652,6 +746,7 @@ Function Compare-Objects {
     $DifferenceCounter = 0
     $NewObjCounter = 0
     $difference = [System.Collections.ArrayList] @()
+    $newObjs = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         $type = $obj.ObjectType
         #Write-Progress -Activity "Comparing objects" -Status "Completed compares out of $total" -PercentComplete ($i/$total*100)
@@ -706,8 +801,6 @@ Function Compare-Objects {
         }   
         # If there is no match between the objects from different sources, the not found object will be added for import
         if (!$obj2) {
-            #Write-Host "New object found:"
-            #Write-Host $obj -ForegroundColor yellow
             $NewObjCounter++
             if ($Anchor -contains "BoundAttributeType" -and $Anchor -contains "BoundObjectType") {
                 if ($bindings -notcontains $RefToAttrSrc) {
@@ -717,7 +810,7 @@ Function Compare-Objects {
                     $global:bindings.Add($RefToObjSrc) | Out-Null   
                 }
             }
-            $difference.Add($obj) | Out-Null
+            $newObjs.Add($obj) | Out-Null
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
             $OriginId = $obj.ObjectID
@@ -749,28 +842,23 @@ Function Compare-Objects {
                 foreach ($mem in $resultComp) {
                     $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $mem.Value
                 }
-                #Write-host "Different object properties found:"
-                #Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
                 $DifferenceCounter++
                 $difference.Add($newObj) | Out-Null
-                if ($newObj.psobject.Properties.Name -contains "BoundAttributeType" -and 
-                $newObj.psobject.properties.Name -contains "BoundObjectType") {
-                    if ($bindings -notcontains $RefToAttrSrc) {
-                        $global:bindings.Add($RefToAttrSrc) | Out-Null
-                    }
-                    if ($bindings -notcontains $RefToObjSrc) {
-                        $global:bindings.Add($RefToObjSrc) | Out-Null   
-                    }
-                }
             }
             $obj.ObjectID = $OriginId
         }
     }
-    if ($difference) {
+    if ($difference -or $Objs) {
         Write-Host "Differences found!" -ForegroundColor Yellow
         Write-Host "Found $NewObjCounter new $Type objects." -ForegroundColor Yellow
         Write-Host "Found $DifferenceCounter different $Type objects." -ForegroundColor Yellow
-        Write-ToXmlFile -DifferenceObjects $difference -path $path -Anchor $Anchor
+        if ($newObjs) {
+            Write-ToXmlFile -DifferenceObjects $newObjs -path $path -Anchor $Anchor -newObjects
+        }
+        if ($difference) {
+            Write-ToXmlFile -DifferenceObjects $difference -path $path -Anchor $Anchor
+        }
+        Write-Host "Written differences in objects to the delta xml file (ConfigurationDelta.xml)"
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
     }
@@ -807,7 +895,11 @@ Function Write-ToXmlFile {
 
         [Parameter(Mandatory=$True)]
         [Array]
-        $Anchor
+        $Anchor,
+
+        [Parameter(Mandatory=$True)]
+        [Switch]
+        $newObjects
     )
     # Inititalization xml file
     $FileName = "$path\configurationDelta.xml"
@@ -894,10 +986,16 @@ Function Write-ToXmlFile {
             if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
                 $xmlVarElement.Set_InnerText($member.Value.Value)
                 $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                $xmlVariable.SetAttribute("operation", "replace")
                 $xmlVariable.SetAttribute("name", $member.Name)
-                $xmlVariable.SetAttribute("type", "xmlref")
-                continue
+                if($newObjects) {
+                    $xmlVariable.SetAttribute("operation", "replace")
+                    $xmlVariable.SetAttribute("type", "xmlref")
+                    continue
+                } else {
+                    $xmlVariable.SetAttribute("operation", "add")
+                    continue
+                }
+                
             }
             $xmlVarElement.Set_InnerText($member.Value)
             $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
@@ -907,8 +1005,6 @@ Function Write-ToXmlFile {
     }
     # Save the xml 
     $XmlDoc.Save($FileName)
-    # Confirmation
-    Write-Host "Written differences in objects to the delta xml file (ConfigurationDelta.xml)"
 }
 
 Function Select-FolderDialog{
@@ -933,12 +1029,12 @@ Function Select-FolderDialog{
     $objForm = New-Object System.Windows.Forms.FolderBrowserDialog
     $objForm.Rootfolder = "Desktop"
     $objForm.Description = $Message
-    $objForm.Description = "Select folder to save the ConfigurationDelta.xml"
     $Show = $objForm.ShowDialog((New-Object System.Windows.Forms.Form -Property @{TopMost = $true }))
     If ($Show -eq "OK") {
         Return $objForm.SelectedPath
     } Else {
         Write-Host "Operation cancelled by user." -ForegroundColor Red
+        return ""
     }
 }
 

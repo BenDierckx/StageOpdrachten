@@ -28,6 +28,11 @@ if(Get-Module -ListAvailable | Where-Object{$_.Name -eq "LithnetRMA"}){
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
 #endregion Lithnet
 
+# Global variable path for the destination folder of the DeltaConfiguration.xml file
+$global:Path = ""
+# Global variable PathToConfigFiles for the source folder of development config xml files
+$global:PathToConfig = ""
+
 Function Start-Migration {
     <#
     .SYNOPSIS
@@ -35,7 +40,7 @@ Function Start-Migration {
     or importing a setup in a different target MIM-Setup.
     
     .DESCRIPTION
-    Call Start-Migration and Export-MIMSetupToXml from the IS4U.Migrate folder! 
+    Call Start-Migration and Export-MIMSetup from the IS4U.Migrate folder! 
     The source MIM-Setup xml files are acquired by calling Export-MIMConfig in the source environment.
     Start-Migration will serialize the target MIM setup resources to clixml and deserialize them
     so they can be compared with the resources from the source xml files.
@@ -50,7 +55,7 @@ Function Start-Migration {
     from the chosen configurations, give the user the choice what will get imported and import them.
 
     .PARAMETER CompareSchema
-    This parameter has the same concept as ComparePolicy and ComparePortal:
+    This parameter is the same as ComparePolicy and ComparePortal:
     The variable All will be set to false, this will cause to only compare the
     configurations where the flags are called, in this case the Schema configuration.
     
@@ -61,7 +66,7 @@ Function Start-Migration {
 
     .Notes
     IMPORTANT:
-    This module has been designed to only use Start-Migration and Export-MIMSetupToXml functions.
+    This module has been designed to only use Start-Migration and Export-MIMSetup functions.
     When other function are called there is no guarantee the desired effect will be accomplished.
     #>
     param(
@@ -83,32 +88,67 @@ Function Start-Migration {
 
         [Parameter(Mandatory=$False)]
         [switch]
-        $ImportDelta
+        $ImportDelta,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathForDelta,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathToConfigFiles
     )
     if (!($All.IsPresent -or $CompareSchema.IsPresent -or $ComparePolicy.IsPresent -or $ComparePortal.IsPresent -or $ImportDelta.IsPresent)) {
         Write-Host "Use Start-Migration with flag(s) (-All, -CompareSchema, -ComparePolicy, -ComparePortal or -ImportDelta)" -ForegroundColor Red
         return
     }
-    #$ExePath = $PSScriptRoot
+    if($PathToConfigFiles){
+        if(Test-Path -path $PathToConfigFiles) {
+        $global:PathToConfig = $PathToConfigFiles
+        } else {
+            Write-Host "$PathToConfigFiles folder not found!" -ForegroundColor Red
+            $global:PathToConfig = Select-FolderDialog -Message "Select the folder where development config files are stored"
+            if(!$PathToConfig){
+                return
+            }
+        }
+    } elseif(!$PathToConfig) {
+        $global:PathToConfig = Select-FolderDialog -Message "Select the folder where development config files are stored"
+        if(!$PathToConfig){
+            return
+        }
+    }
+    if($PathForDelta){
+        if(Test-Path -path $PathForDelta){
+            $global:Path = $PathForDelta
+        } else {
+            Write-Host "No $PathForDelta path found!" -ForegroundColor red
+            $global:Path = Select-FolderDialog -Message "Select the folder where the ConfigurationDelta.xml will be saved"
+            if (!$path) {
+                return
+            }
+        }
+    } elseif (!$path) {
+        $global:Path = Select-FolderDialog -Message "Select the folder where the ConfigurationDelta.xml will be saved"
+        if (!$path) {
+            return
+        }
+    }
     # ReferentialList to store Objects and Attributes in memory for reference of bindings
     $global:ReferentialList = @{SourceRefObjs = [System.Collections.ArrayList]@(); DestRefObjs = [System.Collections.ArrayList] @();
     SourceRefAttrs = [System.Collections.ArrayList]@(); DestRefAttrs = [System.Collections.ArrayList]@()}
     $global:bindingRefs = [System.Collections.ArrayList] @()
-    $path = Select-FolderDialog -Message "Select folder to save the ConfigurationDelta.xml"
-    if (!$path) {
-        return
-    }
     if ($CompareSchema -or $ComparePolicy -or $ComparePortal -or $ImportDelta) {
         $All = $False
     }
     if ($All) {
-        Compare-Schema -path $path
-        Compare-Portal -path $path
-        Compare-Policy -path $path
-        $ImportDelta = $True
+        Compare-Schema -path $path -PathConfig $PathToConfig
+        Compare-Portal -path $path -PathConfig $PathToConfig
+        Compare-Policy -path $path -PathConfig $PathToConfig
+        #$ImportDelta = $True
     } else {
         if ($CompareSchema) {
-            Compare-Schema -path $path
+            Compare-Schema -path $path -PathConfig $PathToConfig
         }
         if ($ComparePolicy) {
             $attrsSource = Get-ObjectsFromXml -XmlFilePath "ConfigAttributes.xml"
@@ -123,10 +163,10 @@ Function Start-Migration {
                     $global:ReferentialList.DestRefAttrs.Add($objt) | Out-Null
                 }
             }
-            Compare-Policy -path $path
+            Compare-Policy -path $path -PathConfig $PathToConfig
         }
         if ($ComparePortal) {
-            Compare-Portal -path $path
+            Compare-Portal -path $path -PathConfig $PathToConfig
         }
     }
     if ($bindingRefs) {
@@ -148,10 +188,12 @@ Function Start-Migration {
         } else {
             Write-Host "No configurationDelta file found: Not created or no differences."
         }
+        Remove-Variable Path -Scope Global
+        Remove-Variable PathToConfig -Scope Global
     }
 }
 
-Function Export-MIMSetupToXml {
+Function Export-MIMSetup {
     <#
     .SYNOPSIS
     Export the source resources from a MIM-Setup to xml files in a CliXml format.
@@ -161,27 +203,71 @@ Function Export-MIMSetupToXml {
     The created files are used with the function Start-Migration so resources can be compared
     between the two setups.
 
-    .Parameter XpathToSet
+    .Parameter XPathToSet
     Give the xpath to a custom Set object. This will be created in a seperate xml file to be 
     imported in the target MIM-Setup.
     #>
     param(
         [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportAll,
+
+        [Parameter(Mandatory=$False)]
         [String]
-        $XpathToSet
+        $PathForExport,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportSchema,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportPolicy,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $ExportPortal,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $XPathToSet
     )
-    Write-Host "Starting export of current MIM configuration to xml files. (This will overwrite existing MIM-config xml files!)"
-    $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
-    while ($conf -notmatch "[y/Y/n/N]") {
-        $conf = Read-Host "Are you sure you want to proceed? [Y/N]"
+    if (!($ExportAll.IsPresent -or $ExportSchema.IsPresent -or $ExportPolicy.IsPresent -or $ExportPortal.IsPresent)) {
+        Write-Host "Use Export-MIMSetup with flag(s) (-ExportAll, -ExportSchema, -ExportPolicy, -ExportPortal)" -ForegroundColor Red
+        return
     }
-    if ($conf.ToLower() -eq "y"){
-        Get-SchemaConfigToXml
-        Get-PortalConfigToXml
-        Get-PolicyConfigToXml -xPathToSet $XpathToSet
+
+    if($PathForExport){
+        if(Test-Path -path $PathForExport) {
+            $global:PathToConfig = $PathForExport
+        } else {
+        Write-Host "$PathForExport folder does not exist. Choose a valid folder" -ForegroundColor Red
+        $global:PathToConfig = Select-FolderDialog -Message "Select the folder where export files will be saved" | Out-Null
+        }
     } else {
-        Write-Host "Export cancelled."
+        $DefaultPath = [Environment]::GetFolderPath("MyDocuments")
+        $global:PathToConfig = $DefaultPath
     }
+    Write-Host "Starting export of the MIM configuration to xml files."
+    if($ExportAll){
+        Get-SchemaConfig
+        Get-PolicyConfig -XPathToSet $XPathToSet
+        Get-PortalConfig
+    } else {
+        if($ExportSchema){
+            Get-SchemaConfig
+        }
+        if($ExportPolicy){
+            Write-Host "Schema configuration automatically added for references!" -ForegroundColor Yellow
+            Get-SchemaConfig
+            Get-PolicyConfig -XPathToSet $XPathToSet
+        }
+        if($ExportPortal){
+            Get-PortalConfig
+        }
+    }
+    Write-Host "Export saved to $PathToConfig!" -ForegroundColor Green
+    Remove-Variable Path -Scope global
 }
 
 Function Start-FimDelta {
@@ -206,9 +292,9 @@ Function Start-FimDelta {
     if(!$Path) {
         $Path = Select-FolderDialog -Message "Select the folder where the ConfigurationDelta.xml is saved!"
     }
-    $ExePath = "$PSScriptRoot\FimDelta.exe"
+    $ExeFile = "$PSScriptRoot\FimDelta.exe"
     if(Test-Path -Path "$Path\ConfigurationDelta.xml"){
-        Start-Process $exeFile "$Path\ConfigurationDelta.xml" -Wait
+        Start-Process $ExeFile "$Path\ConfigurationDelta.xml" -Wait
     } else {
         Write-Host "No ConfigurationDelta.xml file found, try again and select the correct folder."
     }
@@ -232,19 +318,23 @@ Function Compare-Schema {
     param(
         [Parameter(Mandatory=$True)]
         [String]
-        $Path
+        $Path,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathConfig
     )
     # Source of objects to be imported
-    $attrsSource = Get-ObjectsFromXml -XmlFilePath "ConfigAttributes.xml"
+    $attrsSource = Get-ObjectsFromXml -XmlFilePath "$PathConfig\ConfigAttributes.xml"
     foreach($objt in $attrsSource) {
         $global:ReferentialList.SourceRefAttrs.Add($objt) | Out-Null
     }
-    $objsSource = Get-ObjectsFromXml -XmlFilePath "ConfigObjectTypes.xml"
+    $objsSource = Get-ObjectsFromXml -XmlFilePath "$PathConfig\ConfigObjectTypes.xml"
     foreach($objt in $objsSource) {
         $global:ReferentialList.SourceRefObjs.Add($objt) | Out-Null
     }
-    $bindingsSource = Get-ObjectsFromXml -XmlFilePath "ConfigBindings.xml"
-    $cstspecifiersSource = Get-ObjectsFromXml -XmlFilePath "ConfigConstSpecifiers.xml"
+    $bindingsSource = Get-ObjectsFromXml -XmlFilePath "$PathConfig\ConfigBindings.xml"
+    $cstspecifiersSource = Get-ObjectsFromXml -XmlFilePath "$PathConfig\ConfigConstSpecifiers.xml"
     
     # Target Setup objects
     $attrsDest = Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
@@ -286,22 +376,26 @@ Function Compare-Policy {
     param(
         [Parameter(Mandatory=$true)]
         [String]
-        $path
+        $path,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathConfig
     )
     # Source of objects to be imported
-    $mgmntPlciesSrc = Get-ObjectsFromXml -xmlFilePath "ConfigPolicies.xml"
-    $setsSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSets.xml"
+    $mgmntPlciesSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigPolicies.xml"
+    $setsSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigSets.xml"
     if (Test-Path("ConfigCustomSets.xml")) {
-        $CustomSetsSrc = Get-ObjectsFromXml -xmlFilePath "ConfigCustomSets.xml"
+        $CustomSetsSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigCustomSets.xml"
         Write-ToXmlFile -DifferenceObjects $CustomSetsSrc -path $Path -Anchor @("DisplayName")
     }
-    $workflowSrc = Get-ObjectsFromXml -xmlFilePath "ConfigWorkflows.xml"
-    $emailSrc = Get-ObjectsFromXml -xmlFilePath "ConfigEmailTemplates.xml"
-    $filtersSrc = Get-ObjectsFromXml -xmlFilePath "ConfigFilterScopes.xml"
-    $activitySrc = Get-ObjectsFromXml -xmlFilePath "ConfigActivityInfo.xml"
-    $funcSrc = Get-ObjectsFromXml -xmlFilePath "ConfigPolicyFunctions.xml"
-    $syncRSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSyncRules.xml"
-    $syncFSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSyncFilters.xml"
+    $workflowSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigWorkflows.xml"
+    $emailSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigEmailTemplates.xml"
+    $filtersSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigFilterScopes.xml"
+    $activitySrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigActivityInfo.xml"
+    $funcSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigPolicyFunctions.xml"
+    $syncRSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigSyncRules.xml"
+    $syncFSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigSyncFilters.xml"
 
     # Target Setup objects
     $mgmntPlciesDest = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
@@ -348,15 +442,19 @@ Function Compare-Portal {
     param(
         [Parameter(Mandatory=$True)]
         [String]
-        $path
+        $path,
+
+        [Parameter(Mandatory=$False)]
+        [String]
+        $PathConfig
     )
     # Source of objects to be imported
-    $UISrc = Get-ObjectsFromXml -xmlFilePath "ConfigPortalUI.xml"
-    $navSrc = Get-ObjectsFromXml -xmlFilePath "ConfigNavBar.xml"
-    $srchScopeSrc = Get-ObjectsFromXml -xmlFilePath "ConfigSearchScope.xml"
-    $objVisSrc = Get-ObjectsFromXml -xmlFilePath "ConfigObjectVisual.xml"
-    $homePSrc = Get-ObjectsFromXml -xmlFilePath "ConfigHomePage.xml"
-    $configSrc = Get-ObjectsFromXml -xmlFilePath "ConfigConfigur.xml"
+    $UISrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigPortalUI.xml"
+    $navSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigNavBar.xml"
+    $srchScopeSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigSearchScope.xml"
+    $objVisSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigObjectVisual.xml"
+    $homePSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigHomePage.xml"
+    $configSrc = Get-ObjectsFromXml -xmlFilePath "$PathConfig\ConfigConfigur.xml"
 
     # Target Setup objects
     $UIDest = Get-ObjectsFromConfig -ObjectType PortalUIConfiguration
@@ -379,7 +477,7 @@ Function Compare-Portal {
     Write-Host "Compare of Portal configuration completed."
 }
 
-Function Get-SchemaConfigToXml {
+Function Get-SchemaConfig {
     <#
     .SYNOPSIS
     Collect Schema resources from the MIM-Setup and writes them to a xml file in CliXml format.
@@ -400,7 +498,7 @@ Function Get-SchemaConfigToXml {
     Write-ToCliXml -Objects $constantSpec -xmlName ConstSpecifiers
 }
 
-Function Get-PolicyConfigToXml {
+Function Get-PolicyConfig {
     <#
     .SYNOPSIS
     Collect Policy resources from the MIM-Setup and writes them to a xml file in CliXml format.
@@ -409,21 +507,21 @@ Function Get-PolicyConfigToXml {
     Collect Policy resources from the MIM-Setup and writes them to a xml file in CliXml format.
     These xml files are used at the target MIM-Setup for importing the differences.
     
-    .PARAMETER xPathToSet
+    .PARAMETER XPathToSet
     Xpath to a custom Set object in the MIM-Setup
     #>
     
     param(
         [Parameter(Mandatory=$False)]
         [String]
-        $xPathToSet
+        $XPathToSet
     )
     $mgmntPolicies = Get-ObjectsFromConfig -ObjectType ManagementPolicyRule
     $sets = Get-ObjectsFromConfig -ObjectType Set
     $CustomSets = $null
-    if ($xPathToSet) {
-        $xPathToSet -replace '[/]', ''
-        $CustomSets = Get-ObjectsFromConfig -ObjectType $xPathToSet
+    if ($XPathToSet) {
+        $XPathToSet -replace '[/]', ''
+        $CustomSets = Get-ObjectsFromConfig -ObjectType $XPathToSet
     }
     $workflowDef = Get-ObjectsFromConfig -ObjectType WorkflowDefinition
     $emailtmplt = Get-ObjectsFromConfig -ObjectType EmailTemplate
@@ -449,7 +547,7 @@ Function Get-PolicyConfigToXml {
     Write-ToCliXml -Objects $syncFilter -xmlName SyncFilters 
 }
 
-Function Get-PortalConfigToXml {
+Function Get-PortalConfig {
     <#
     .SYNOPSIS
     Collect Portal resources from the MIM-Setup and writes them to a xml file in CliXml format.
@@ -541,9 +639,15 @@ Function Write-ToCliXml {
         $xmlName
     )
     if($Objects){
-        Export-Clixml -InputObject $Objects -Path "Config$xmlName.xml" -Depth 4 
+        if(Test-Path -path "$PathToConfig\MIMExportFiles"){
+            Export-Clixml -InputObject $Objects -Path "$PathToConfig\MIMExportFiles\Config$xmlName.xml" -Depth 4
+        } else {
+            New-Item -ItemType directory -Path "$pathToConfig\MIMExportFiles"
+            Export-Clixml -InputObject $Objects -Path "$PathToConfig\MIMExportFiles\Config$xmlName.xml" -Depth 4
+        }
     }
 }
+
 
 Function Get-ObjectsFromXml {
     <#
@@ -551,7 +655,7 @@ Function Get-ObjectsFromXml {
     Retrieve resources from a xml file.
     
     .DESCRIPTION
-    Retrieve resources from a xml file that has been created by Export-MimConfigToXml. This file contains
+    Retrieve resources from a xml file that has been created by Export-MimConfig. This file contains
     resources from a MIM-Setup that have been serialized and deserialized by using the CliXml format.
     
     .EXAMPLE
@@ -624,6 +728,7 @@ Function Compare-MimObjects {
     $DifferenceCounter = 0
     $NewObjCounter = 0
     $difference = [System.Collections.ArrayList] @()
+    $newObjs = [System.Collections.ArrayList] @()
     foreach ($obj in $ObjsSource){
         $type = $obj.ObjectType
         Write-Host "`rComparing $Type objects: $i/$total...`t" -NoNewline
@@ -671,8 +776,6 @@ Function Compare-MimObjects {
         }
         # If there is no match between the objects from different sources the object will be added for import
         if (!$obj2) {
-            #Write-Host "New object found:"
-            #Write-Host $obj -ForegroundColor yellow
             $NewObjCounter++
             if ($Anchor -contains "BoundObjectType" -and $Anchor -contains "BoundAttributeType") { 
                 if ($bindingRefs -notcontains $RefToAttrSrc) {
@@ -682,7 +785,7 @@ Function Compare-MimObjects {
                     $global:bindingRefs.Add($RefToObjSrc) | Out-Null   
                 }
             }
-            $difference.Add($obj) | Out-Null
+            $newObjs.Add($obj) | Out-Null
         } else {
             # Give the object the ObjectID from the target object => comparing reasons
             $OriginId = $obj.ObjectID
@@ -713,28 +816,23 @@ Function Compare-MimObjects {
                 foreach($mem in $resultComp){
                     $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $Mem.Value
                 }
-                #Write-host "Different object properties found:"
-                #Write-host $newObj -ForegroundColor Yellow -BackgroundColor Black
                 $DifferenceCounter++
                 $difference.Add($newObj) | Out-Null
-                if ($newObj.psobject.properties.Name -contains "BoundAttributeType" -and 
-                $newObj.psobject.properties.Name -contains "BoundObjectType") { 
-                    if ($bindingRefs -notcontains $RefToAttrSrc) {
-                        $global:bindingRefs.Add($RefToAttrSrc) | Out-Null
-                    }
-                    if ($bindingRefs -notcontains $RefToObjSrc) {
-                        $global:bindingRefs.Add($RefToObjSrc) | Out-Null   
-                    }
-                }
             }
             $obj.ObjectID = $OriginId
         }
     }
-    if ($difference) {
+    if ($difference -or $newObjs) {
         Write-Host "Differences found!" -ForegroundColor Yellow
         Write-Host "Found $NewObjCounter new $Type objects." -ForegroundColor Yellow
         Write-Host "Found $DifferenceCounter different $Type objects." -ForegroundColor Yellow
-        Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor
+        if ($newObjs){
+            Write-ToXmlFile -DifferenceObjects $newObjs -path $path -Anchor $Anchor -newObjects
+        }
+        if ($difference){
+            Write-ToXmlFile -DifferenceObjects $Difference -path $path -Anchor $Anchor 
+        }
+        Write-Host "Written differences in objects to the delta xml file (ConfigurationDelta.xml)"
     } else {
         Write-Host "No differences found!" -ForegroundColor Green
     }
@@ -772,7 +870,11 @@ Function Write-ToXmlFile {
 
         [Parameter(Mandatory=$True)]
         [Array]
-        $Anchor
+        $Anchor,
+
+        [Parameter(Mandatory=$False)]
+        [Switch]
+        $newObjects
     )
     # Inititalization xml file
     $FileName = "$path\configurationDelta.xml"
@@ -859,10 +961,15 @@ Function Write-ToXmlFile {
             if ($member.Name -eq "BoundAttributeType" -or $member.Name -eq "BoundObjectType") {
                 $xmlVarElement.Set_InnerText($member.Value.Value)
                 $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
-                $xmlVariable.SetAttribute("operation", "replace")
                 $xmlVariable.SetAttribute("name", $member.Name)
-                $xmlVariable.SetAttribute("type", "xmlref")
-                continue
+                if($newObjects){
+                    $xmlVariable.SetAttribute("operation", "replace")
+                    $xmlVariable.SetAttribute("type", "xmlref")
+                    continue
+                } else {
+                    $xmlVariable.SetAttribute("operation", "add")
+                    continue
+                }
             }
             $xmlVarElement.Set_InnerText($member.Value)
             $xmlVariable = $XmlAttributes.AppendChild($xmlVarElement)
@@ -872,7 +979,6 @@ Function Write-ToXmlFile {
     }
     # Save the xml 
     $XmlDoc.Save($FileName)
-    Write-Host "Written differences in objects to the delta xml file (ConfigurationDelta.xml)"
 }
 
 
@@ -903,6 +1009,7 @@ Function Select-FolderDialog{
         Return $objForm.SelectedPath
     } Else {
         Write-Host "Operation cancelled by user." -ForegroundColor Red
+        return ""
     }
 }
 

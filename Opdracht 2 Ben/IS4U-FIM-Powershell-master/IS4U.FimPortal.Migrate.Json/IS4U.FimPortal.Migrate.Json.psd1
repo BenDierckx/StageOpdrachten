@@ -5,7 +5,7 @@
 @{
 
     # Script module or binary module file associated with this manifest.
-    RootModule = 'IS4U.MigrateJson.psm1'
+    RootModule = 'IS4U.FimPortal.Migrate.Json.psm1'
     
     # Version number of this module.
     ModuleVersion = '1.0'
@@ -75,7 +75,7 @@
     # NestedModules = @()
     
     # Functions to export from this module
-    FunctionsToExport = 'Start-MigrationJson', 'Export-MIMSetupToJson', 'Start-FimDelta', 'Get-SchemaConfigToJson', 'Get-PolicyConfigToJson', 'Get-PortalConfigToJson', 'Convert-ToJson', 'Get-ObjectsFromJson', 'Compare-Objects', 'Write-ToXmlFile', 'Select-FolderDialog', 'Import-Delta'
+    FunctionsToExport = 'Start-Migration', 'Export-MIMSetup', 'Start-FimDelta', 'Convert-ToJson', 'Get-ObjectsFromJson', 'Compare-Objects', 'Write-ToXmlFile', 'Select-FolderDialog', 'Import-Delta'
     
     # Cmdlets to export from this module
     CmdletsToExport = ''

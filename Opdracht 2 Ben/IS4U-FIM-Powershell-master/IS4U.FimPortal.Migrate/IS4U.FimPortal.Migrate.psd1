@@ -5,7 +5,7 @@
 @{
 
     # Script module or binary module file associated with this manifest.
-    RootModule = 'IS4U.Migrate.psm1'
+    RootModule = 'IS4U.FimPortal.Migrate.psm1'
     
     # Version number of this module.
     ModuleVersion = '1.0'
@@ -75,8 +75,8 @@
     # NestedModules = @()
     
     # Functions to export from this module
-    FunctionsToExport = 'Start-Migration', 'Export-MIMSetupToXml', 'Start-FimDelta', 'Get-SchemaConfigToXml', 'Get-PolicyConfigToXml', 
-    'Get-PortalConfigToXml', 'Write-ToCliXml', 'Get-ObjectsFromXml', 'Compare-MimObjects', 'Write-ToXmlFile', 'Import-Delta'
+    FunctionsToExport = 'Start-Migration', 'Export-MIMSetup', 'Start-FimDelta',
+    'Write-ToCliXml', 'Get-ObjectsFromXml', 'Compare-MimObjects', 'Write-ToXmlFile', 'Import-Delta'
     
     # Cmdlets to export from this module
     CmdletsToExport = ''
