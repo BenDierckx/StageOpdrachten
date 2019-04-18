@@ -16,15 +16,8 @@ here: http://opensource.org/licenses/gpl-3.0.
 Set-StrictMode -Version Latest
 
 #region Lithnet
-if (Get-Module -ListAvailible | Where-Object{$_Name -eq "LithnetRMA"}){
-    if (!(Get-Module -Name LithnetRMA)) {
-        Import-Module LithnetRMA
-    }
-    else {
-        $ExePath = $PSScriptRoot
-        Start-Process -FilePath "$ExePath\Lithnet.ResourceManagement.Automation.msi"
-        Import-Module LithnetRMA
-    }
+if (!(Get-Module -Name LithnetRMA)) {
+    Import-Module LithnetRMA
 }
 
 #Set-ResourceManagementClient -BaseAddress http://localhost:5725;
@@ -40,37 +33,50 @@ $Global:PathToConfig = ""
 Function Start-Migration {
     <#
     .SYNOPSIS
-    Starts the migration of a MIM-Setup by either comparing certain configurations
-    or importing a setup in a different target MIM-Setup.
+    tarts the migration of a MIM-Setup by either comparing certain configurations between a source MIM-Setup and a
+    target MIM-Setup or importing the delta in a target MIM-Setup.
     
     .DESCRIPTION
-    Call Start-Migration and Export-MIMSetup from the IS4U.MigrateJson folder! 
     The source MIM-Setup json files are acquired by calling Export-MIMConfig in the source environment.
-    Start-MigrationJson will serialize the target MIM setup resources to json and deserialize them
+    Start-Migration will serialize the target MIM setup resources to json and deserialize them
     so they can be compared with the resources from the source json files.
-    The differences that are found are writen to a Lithnet-format xml file, called ConfigurationDelta.xml.
-    When Start-Migration is called with -ImportDelta or -All, the FimDelta.exe program is 
+    The differences that are found are writen to a Lithnet-format xml file called ConfigurationDelta.xml.
+    When Start-Migration is called with -ImportDelta, the FimDelta.exe program is 
     called and the user can choose which resources get imported from the configuration delta.
     The final (or total) configuration then gets imported in the target MIM-Setup.  
-    
-    .PARAMETER ImportDelta
-    When Start-Migration is called with a parameter other then -All no import will be executed. To ensure the differences get
-    imported in the target MIM-Setup call 'Start-Migration -ImportDelta'. This will use the created ConfigurationDelta.xml
-    from the chosen configurations, give the user the choice what will get imported and import them.
+
+    .PARAMETER All
+    If Start-Migration is called with the flag parameter '-All', all resources that are found in the Source and Target MIM-Setup
+    will be compared. This will automatically create a complete ConfigurationDelta.xml where all the new and different resources
+    are stored for every MIM-object type.
 
     .PARAMETER CompareSchema
-    This parameter is the same concept as ComparePolicy and ComparePortal:
-    When True, ImportAllConfigurations will be set to false, this will cause to only compare the
-    configurations where the parameters are set to True, in this case the Schema configuration.
+    This parameter has the same effect as ComparePolicy and ComparePortal:
+    The variable All will be set to false, this will cause to only compare the
+    configurations where the flags are called, in this case the Schema configuration.
+    
+    .PARAMETER ImportDelta
+    To ensure the differences get imported in the target MIM-Setup, call 'Start-Migration -ImportDelta'.
+    This will use the created ConfigurationDelta.xml (from the chosen configurations) with Start-FimDelta (FimDelta.exe).
+    If the user wishes to not import all resources and saves the selected resources, a ConfigurationDelta2.xml file will be
+    created. The ConfigurationDelta.xml or ConfigurationDelta2.xml then gets imported in the target MIM-Setup.
+
+    .PARAMETER PathToConfigFiles
+    Optional parameter to declare a path where the resources in xml files are located. If this parameter is not declared
+    a folder browser prompt will appear where the user can choose this path.
+
+    .PARAMETER PathForDelta
+    Optional parameter to declare a path where the ConfigurationDelta(2).xml will be saved. If this parameter is not declared
+    a folder browser prompt will appear where the user can choose this path.
     
     .EXAMPLE
-    Start-Migration -All
-    Start-Migration -CompareSchema
+    Start-Migration -All -PathForDelta "C:\" -PathToConfigFiles "C:\Program Files\MIMExportFiles"
+    Start-Migration -ComparePolicy -CompareSchema
     Start-Migration -ImportDelta
 
     .Notes
     IMPORTANT:
-    This module has been designed to only use Start-MigrationJson and Export-MIMSetup functions.
+    This module has been designed to only use Start-Migration and Export-MIMSetup functions.
     When other functions are called there is no guarantee the desired effect will be accomplished.
     #>
     param(
@@ -97,11 +103,11 @@ Function Start-Migration {
 
         [Parameter(Mandatory=$False)]
         [String]
-        $PathForDelta,
+        $PathToConfigFiles,
 
         [Parameter(Mandatory=$False)]
         [String]
-        $PathToConfigFiles
+        $PathForDelta
     )
     if (!($All.IsPresent -or $CompareSchema.IsPresent -or $ComparePolicy.IsPresent -or $ComparePortal.IsPresent -or $ImportDelta.IsPresent)) {
         Write-Host "Use Start-Migration with flag(s) (-All, -CompareSchema, -ComparePolicy, -ComparePortal or -ImportDelta)" -ForegroundColor Red
@@ -211,9 +217,34 @@ Function Export-MIMSetup {
     The created files are used with the function Start-Migration so resources can be compared
     between the two setups.
 
+    .Parameter ExportAll
+    Ensure all the resources found in the source MIM-Setup are exported and converted to json files in a json format.
+    For every object type (that has resources) a json file will be created and saved to a certain path.
+
+    .Parameter ExportSchema
+    Ensure all the Schema resources found in the source MIM-Setup are exported and converted to json files in a json format.
+    For every object type (that has resources) a json file will be created and saved to a certain path. 
+
+    .Parameter ExportPolicy
+    Ensure all the Policy resources found in the source MIM-Setup are exported and converted to json files in a json format.
+    For every object type (that has resources) a json file will be created and saved to a certain path.
+    Schema resources are also automatically retrieved and saved to json files, certain resources require references 
+    to attributes from the Schema-configuration.
+
+    .Parameter ExportPortal
+    Ensure all the Portal resources found in the source MIM-Setup are exported and converted to json files in a json format.
+    For every object type (that has resources) a json file will be created and saved to a certain path.
+
+    .Parameter PathForExport
+    Optional parameter to declare a path where the folder, containing the configuration json files, is saved.
+    If this path is not declared, the folder will be saved in the Documents (MyDocuments) folder.
+
     .Parameter XpathToSet
     Give the xpath to a custom Set object. This will be created in a seperate json file to be 
     imported in the target MIM-Setup.
+
+    .Example
+    Export-MIMSetup -ExportAll
     #>
     param(
         [Parameter(Mandatory=$False)]
@@ -283,12 +314,16 @@ Function Start-FimDelta {
     
     .DESCRIPTION
     Starts the FimDelta application where the user can choose which resources are to be saved to the
-    ConfigurationDelta2.xml. These resources are created after a compare between two configurations and is called
-    ConfigurationDelta.xml. The ConfigurationDelta2.xml if created is used for Import-Delta, to import all the chosen resources.
-    When nothing is saved to ConfigurationDelta2.xml, the ConfigurationDelta.xml is used instead.
+    ConfigurationDelta2.xml. These resources are created after a compare between two configurations and are placed in a file
+    called ConfigurationDelta.xml. 
+    The ConfigurationDelta2.xml, if created, is used for Import-Delta to import all the chosen resources.
+    When nothing is saved to ConfigurationDelta2.xml, the ConfigurationDelta.xml is used instead for import.
     
     .PARAMETER Path
     Path to where ConfigurationDelta.xml is currently saved.
+
+    .Example
+    Start-FimDelta -Path "C:\"
     #>
     param (
         [Parameter(Mandatory=$True)]
@@ -342,11 +377,14 @@ Function Compare-Schema {
     
     .DESCRIPTION
     Gets the Schema resources from the source (Get-ObjectsFromJson) and target MIM-Setup (Get-ObjectsFromConfig). 
-    Each object type in the Schema configuration calls (if found) the function Compare-MimObjects using the found objects of
-    the corresponding object type.
+    Each object type in the Schema configuration calls the function Compare-MimObjects using the found objects of
+    the corresponding object type. Compare-MimObjects will compare the resources and write the differences to a xml file.
     
     .PARAMETER Path
-    Path to where ConfigurationDelta.xml will be saved.
+    Path given by Start-Migration to where ConfigurationDelta.xml will be saved.
+
+    .Parameter PathConfig
+    Path given by Start-Migration to where the configuration xml files containing the source resources are stored.
     #>
     param(
         [Parameter(Mandatory=$True)]
@@ -402,7 +440,7 @@ Function Get-PolicyConfig {
     These json files are used at the target MIM-Setup for importing the differences.
     
     .PARAMETER xPathToSet
-    Xpath to a custom Set object in the MIM-Setup
+    Xpath to a custom Set of objects in the MIM-Setup.
     #>
     param(
         [Parameter(Mandatory=$False)]
@@ -449,11 +487,14 @@ Function Compare-Policy {
     
     .DESCRIPTION
     Gets the Policy resources from the source (Get-ObjectsFromJson) and target MIM-Setup (Get-ObjectsFromConfig). 
-    Each object type in the Policy configuration calls (if found) the function Compare-MimObjects using the found objects of
-    the corresponding object type.
+    Each object type in the Policy configuration calls the function Compare-MimObjects using the found objects of
+    the corresponding object type. Compare-MimObjects will compare the resources and write the differences to a xml file.
     
     .PARAMETER Path
-    Path to where ConfigurationDelta.xml will be saved.
+    Path given by Start-Migration to where ConfigurationDelta.xml will be saved.
+
+    .Parameter PathConfig
+    Path given by Start-Migration to where the configuration xml files containing the source resources are stored.
     #>
     param(
         [Parameter(Mandatory=$True)]
@@ -547,11 +588,14 @@ Function Compare-Portal {
     
     .DESCRIPTION
     Gets the Portal resources from the source (Get-ObjectsFromJson) and target MIM-Setup (Get-ObjectsFromConfig). 
-    Each object type in the Portal configuration calls (if found) the function Compare-MimObjects using the found objects of
-    the corresponding object type.
+    Each object type in the Portal configuration calls the function Compare-MimObjects using the found objects of
+    the corresponding object type. Compare-MimObjects will compare the resources and write the differences to a xml file.
     
     .PARAMETER Path
-    Path to where ConfigurationDelta.xml will be saved.
+    Path given by Start-Migration to where ConfigurationDelta.xml will be saved.
+
+    .Parameter PathConfig
+    Path given by Start-Migration to where the configuration xml files containing the source resources are stored.
     #>
     param(
         [Parameter(Mandatory=$True)]
@@ -600,15 +644,12 @@ Function Get-ObjectsFromConfig {
     
     .DESCRIPTION
     Gets the resources from the MIM-Setup that correspond to the given object type.
-    The read-only members of the resources get stripped as they can not be imported in a target MIM-Setup.
-    The updated resources then get serialized and deserialized so that they are the same when comparing.
+    The read-only members of the resources are stripped as they can not be imported in a target MIM-Setup.
+    The updated resources then get serialized and deserialized so that they are the same format when comparing.
     The final resources are then returned.
     
     .PARAMETER ObjectType
     Object type of a type of resource in the MIM-Setup.
-    
-    .EXAMPLE
-    Get-ObjectsFromConfig -ObjectType AttributeTypeDescription
     #>
     param(
         [Parameter(Mandatory=$True)]
@@ -641,10 +682,14 @@ Function Convert-ToJson {
     Converts objects to a json file using the json format.
     
     .DESCRIPTION
-    Converts objects to a json file using the json format.
+    Converts objects to a json file using the json format. The files are saved in a folder called MIMExportFiles.
+    This folder is saved in the declared path from Export-MIMObjects.
+
+    .PARAMETER Objects
+    Array of objects that will be converted to a json file in a json format.
 
     .Parameter JsonName
-    Give the name of the json file. The name will be placed between 'Config' and '.json'.
+    The name of the json file. The name will be placed between 'Config' and '.json'.
     #>
     param(
         [Parameter(Mandatory=$False)]
@@ -697,11 +742,11 @@ Function Get-ObjectsFromJson {
 Function Compare-Objects {
     <#
     .SYNOPSIS
-    Compares two arrays of MIM object type resources and sends the differences to Write-ToXmlFile
+    Compares two arrays of MIM-object type resources and sends the differences to Write-ToXmlFile.
     
     .DESCRIPTION
-    Compares two arrays containing resources from source and target MIM-Setups. The objects that are references from other objects
-    get added immediatly without comparing for differences (these are needed for references in xml). 
+    Compares two arrays containing resources from the source and target MIM-Setup. The objects that are referenced by objects that
+    are new for the target MIM-Setup, get immediatly added without comparing for differences (these are needed for references in xml).
     Counters keep track of the found differences and new objects and give a summary to the user.
     The final differences from new objects, different objects and referentials are send to Write-ToXmlFile to create
     a delta configuration file used for importing.
@@ -723,6 +768,9 @@ Function Compare-Objects {
     .NOTES
     This compare function has been designed to compare objects in an array that follow a structure that is used in a MIM-Setup.
     When comparing objects that do not have this design, the compare can crash.
+
+    .Example
+    Compare-MimObjects -ObjsSource $AttrsSource -ObjsDestination $AttrsDest -Path "C:\"
     #>
     param (
         [Parameter(Mandatory=$True)]
@@ -867,16 +915,22 @@ Function Compare-Objects {
 Function Write-ToXmlFile {
     <#
     .SYNOPSIS
-    Writes an array of objects to a Lithnet format xml file.
+    Writes an array of objects to a Lithnet format xml file called ConfigurationDelta.xml.
     
     .DESCRIPTION
     Writes the given array of objects to a xml file using a Lithnet format that Import-RmConfig can read and import.
+    This file is saved as ConfigurationDelta.xml and can be used by either Import-Delta (from Start-Migration -ImportDelta) 
+    or Start-FimDelta.
     ObjectID's from the resources are used as xml-references in the xml file. When more references are found, the
-    referenced objects are added to the global variable bindings. Objects from the variable bindings are written to the same
+    referenced objects are added to the global variable bindings. Objects from the global bindings are written to the same
     xml file used in this function so that references can be found.
     
     .PARAMETER DifferenceObjects
-    Array of found resources that are different, new or referenced to
+    Array of found resources that are different.
+
+    .Parameter NewObjects
+    If the send resources are new objects, the flag NewObjects is called with them. This ensures that the resources
+    use xml references instead of Lithnet references (to ObjectID's).
     
     .PARAMETER path
     Path to where ConfigurationDelta.xml will be saved.
@@ -1015,6 +1069,9 @@ Function Select-FolderDialog{
     .DESCRIPTION
     This function makes the user choose a destination folder to save the xml configuration delta.
     If The user aborts this, the script will stop executing.
+
+    .PARAMETER Message
+    A message that will appear in the folder browser prompt.
     
     .LINK
     https://stackoverflow.com/questions/11412617/get-a-folder-path-from-the-explorer-menu-to-a-powershell-variable
@@ -1041,11 +1098,11 @@ Function Select-FolderDialog{
 Function Import-Delta {
     <#
     .SYNOPSIS
-    Import a delta or more in a MIM-setup
+    Import a delta configuration xml file in a MIM-setup.
     
     .DESCRIPTION
     Import the differences between the source MIM setup and the target MIM setup in the target 
-    MIM setup using a delta in xml.
+    MIM setup using a delta in xml. This delta is created by the Start-Migration calls to compare functions.
     
     .PARAMETER DeltaConfigFilePath
     The path to a delta of a configuration in a xml file (ConfigurationDelta.xml or ConfigurationDelta2.xml).
