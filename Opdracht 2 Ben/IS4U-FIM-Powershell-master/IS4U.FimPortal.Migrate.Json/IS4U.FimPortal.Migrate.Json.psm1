@@ -886,12 +886,12 @@ Function Compare-Objects {
                 #Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
                 $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in original!
                 $resultComp = $compObj | Where-Object membertype -Like 'noteproperty'
-                $newObj = [PSCustomObject]@{}
+                $updatedObj = [PSCustomObject]@{}
                 foreach ($mem in $resultComp) {
-                    $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $mem.Value
+                    $updatedObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $mem.Value
                 }
                 $DifferenceCounter++
-                $difference.Add($newObj) | Out-Null
+                $difference.Add($updatedObj) | Out-Null
             }
             $obj.ObjectID = $OriginId
         }

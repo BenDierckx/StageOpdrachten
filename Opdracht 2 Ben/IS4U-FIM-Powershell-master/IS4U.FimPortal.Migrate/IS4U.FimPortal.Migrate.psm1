@@ -859,12 +859,12 @@ Function Compare-MimObjects {
                 #Write-Host $obj2 -BackgroundColor White -ForegroundColor Black
                 $compObj = $compResult | Where-Object {$_.SideIndicator -eq '<='} # Difference in source object!
                 $resultComp = $compObj | Where-Object membertype -like 'noteproperty'
-                $newObj = [PSCustomObject] @{}
+                $updatedObj = [PSCustomObject] @{}
                 foreach($mem in $resultComp){
-                    $newObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $Mem.Value
+                    $updatedObj | Add-Member -NotePropertyName $mem.Name -NotePropertyValue $Mem.Value
                 }
                 $DifferenceCounter++
-                $difference.Add($newObj) | Out-Null
+                $difference.Add($updatedObj) | Out-Null
             }
             $obj.ObjectID = $OriginId
         }
