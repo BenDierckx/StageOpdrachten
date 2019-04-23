@@ -651,6 +651,7 @@ function Get-ObjectsFromConfig {
         }
         Write-ToCliXml -Objects $objects -xmlName Temp   
         $objects = Import-Clixml "$PathToConfig\ConfigTemp.xml"
+        Remove-Item -Path "$PathToConfig\ConfigTemp.xml"
     } else {
         Write-Host "No $ObjectType objects found to write to clixml!"
     }
