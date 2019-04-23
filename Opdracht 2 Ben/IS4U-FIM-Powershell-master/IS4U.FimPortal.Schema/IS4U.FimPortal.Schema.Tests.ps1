@@ -1,465 +1,462 @@
 ﻿Import-Module IS4U.FimPortal.Schema
+<#
+Navigate to the "/IS4U.FimPortal.Schema" folder
+If testing while connected to a MIM-Environment:
+Make sure Save-Resource calls in functions are in comment so no new objects are actually created
+Start tests with: PS > Invoke-Pester
+#>
 
-Class NewFimImportObject {
-    [string]$ObjectType
-    [string]$State
-    [Hashtable]$Changes = @{}
-    [Hashtable]$Anchor = @{}
-    [bool]$ApplyNow
-    [bool]$SkipDuplicateCheck
-    [bool]$PassThru
-    [Int]$TargetObjectIdentifier
+Describe "New-Person" {
+    Mock New-Resource {
+        $obj = [PSCustomObject]@{
+            Address = ""
+            City = ""
+            Country = ""
+            Department = ""
+            DisplayName = ""
+            Domain = ""
+            EmailAlias = ""
+            EmployeeId = ""
+            EmployeeType = ""
+            FirstName = ""
+            JobTitle = ""
+            LastName = ""
+            OfficePhone = ""
+            PostalCode = ""
+            RasAccessPermission = ""
+        }
+    return $obj
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        $result = New-Person -Address "Street lane" -City Edegem -Country BE -Department Sec -DisplayName MSamson `
+        -Domain FIM -EmailAlias msamson -EmployeeID 6555 -EmployeeType Intern -FirstName Mark -JobTitle Engineer -LastName Samson `
+        -OfficePhone 045578461 -PostalCode 2650
+        It "New-Resource gets called" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 1
+        }
+        It "New-Resource uses correct parameters" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                #$ObjectType -eq "User"     ## User is DisplayName, Person is ObjectType
+                $ObjectType -eq "Person"
+            }
+        }
+        It "Save-Resource should get correct object input (using return from New-Person with variable resource)" {
+            $result.FirstName | Should be "Mark"
+            $result.RasAccessPermission | Should be $False
+            $result.EmployeeId | Should be 6555
+            $result.OfficePhone.GetType() | Should be int
+        }
+    }
+}
+
+Describe "Update-Person" {
+    Mock Get-Resource {
+        $obj = [PSCustomObject]@{
+            Address = ""
+            City = ""
+            Country = ""
+            Department = ""
+            DisplayName = ""
+            Domain = ""
+            EmailAlias = ""
+            EmployeeId = ""
+            EmployeeType = ""
+            FirstName = ""
+            JobTitle = ""
+            LastName = ""
+            OfficePhone = ""
+            PostalCode = ""
+            RasAccessPermission = ""
+        }
+    return $obj
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        $result = Update-Person -DisplayName "Test" -FirstName "VV" -LastName "PP"
+        it "Get-Resource gets called with correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                #$ObjectType -eq "User" ##Is DisplayName
+                $ObjectType -eq "Person"
+                $AttributeName | Should be "DisplayName"
+                $AttributeValue | Should be "Test"
+            }
+        }
+
+        it "Correct parameters from Update-Person get used to update the person" {
+            $result.DisplayName | Should be "Test"
+            $result.FirstName | Should be "VV"
+            $result.LastName | Should be "PP"
+        }
+    }
+}
+
+Describe "Remove-Person" {
+    Mock Get-Resource {
+        #return [Guid]"9a096ed2-825b-43ae-9bb6-86045293c67e" ## Previous
+        $obj = [PSCustomObject]@{
+            ObjectId = @{Value = [Guid]"9a096ed2-825b-43ae-9bb6-86045293c67e"}
+        }
+        return $obj
+    }-ModuleName "IS4U.FimPortal.Schema"
+    Mock Remove-Resource -ModuleName "IS4U.fimPortal.Schema"
+    Context "With parameter" {
+        Remove-Person -DisplayName MSamson
+        It "Get-Resource uses correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter{
+                #$ObjectType -eq "User"
+                $ObjectType -eq "Person"
+                $AttributeName | Should be "DisplayName"
+                $AttributeValue | Should be "MSamson"
+                $AttributesToGet | Should be "ObjectID"
+            }
+        }
+        It "Remove-Resource uses correct ID type" {
+            Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ID -eq "9a096ed2-825b-43ae-9bb6-86045293c67e"
+            }
+        }
+    }
 }
 
 Describe "New-Attribute" {
-    
-    Context "Module Setup" {
-        It "module file exists" {
-            Get-Module -ListAvailable | Where-Object {$_.Name -eq 'IS4U.FimPortal.Schema'}
-        }
-    }
-
-    Context "With parameters (mandatory)" {
-        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {$ObjectType, $State, $changes}
+    Mock New-Resource {
+        <#
+            PSCustomObject is used here instead of New-MockObject.
+            This is because New-MockObject only accepts the parameter -Type.
+            A request for parameters in New-MockObject has been made but not yet implemented (limitations and practicality):
+            https://github.com/pester/Pester/issues/694
+            PSCustomObject lets us return an object with variables that can be filled and tested.
+        #>
+        $test = [PSCustomObject]@{
+                DisplayName = ""    # Empty values (not null) because Hashtable requires Keys that are set
+                Name = ""           # These get filled in the tested function
+                Description = ""
+                DataType = "" 
+                MultiValued = ""
+            }
+        return $test
+    } -ModuleName "IS4U.FimPortal.Schema"
+    # Save-Resource can not be mocked when the required parameter is not of RmaObject type.
+    # If this type is forced it will not accept the PsCustomObject that gets used as variable in RmaObject
+    #Mock Save-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
         $result = New-Attribute -Name Visa -DisplayName Visa -Type String -MultiValued "False"
-
-        It "New-FimImportObject get called" {
-            Assert-MockCalled -CommandName New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
+        It "New-Resource gets called" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 1
         }
-        
-        It "Parameters get saved into object (Name, DisplayName, Type (mandatory), Description, MultiValued (Optional)" {
-            #Write-Host($result.changes)    ## This is just to check what changes contained
-            Assert-MockCalled New-FimImportObject -ParameterFilter{
-                $changes["Name"] -eq "Visa" -and $changes["DisplayName"] -eq "Visa" -and $changes["DataType"] -eq "String"
-            } -ModuleName "IS4U.FimPortal.Schema"
+        It "New-Resource gets correct parameters" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                # At least one -eq comparison has to be entered for the ParameterFilter work
+                $ObjectType -eq "AttributeTypeDescription" 
+            }
         }
-
-        It "Return correct object" {
-            #Write-Host($result[2].Values)  ## This is just to check certain values
-            $result[0] -eq "AttributeTypeDescription" -and $result[1] -eq "Create" -and $result[2]["Name"] -eq "Visa" | Should be $true
+        It "obj gets filled and should be send to Save-Resource" {
+            $result.DisplayName | Should be "Visa"
+            $result.Name | Should be "Visa"
+            $result.DataType | Should be "String"
+            $result.MultiValued | Should be "False"
+            $result.Description | Should beNullOrEmpty
         }
     }
 }
 
 Describe "Update-Attribute" {
-    Context "With parameters (mandatory)" {
-        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $ObjectType, $State, $anchor, $changes, $ApplyNow
+    Mock Get-Resource {
+        $obj = [PSCustomObject]@{
+            Name = ""
+            DisplayName = "" 
+            Description = ""
         }
-        #[GUID]$Id = "66b7d725-8226-4ccd-99ad-3540c44c49b6"
-        Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
-        $result = Update-Attribute -Name Visum -DisplayName Visum -Description "Update test"
-        It "Module file is ready to be loaded" {
-            Get-Module -ListAvailable | Where-Object {$_.Name -eq 'IS4U.FimPortal.Schema'}
+        # psTypeNames does not work here, only correct variables of a specific type can be inserted in a RmaObject
+        #$obj.psTypeNames.Insert(0, "Lithnet.ResourceManagement.Automation.RmaObject[]")
+        return $obj
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Mock Save-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        $result = Update-Attribute -Name "Visa" -DisplayName "Visa" -Description "Test"
+        It "New-Resource gets correct parameters when called" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "AttributeTypeDescription" -and $AttributeName -eq "Name"
+                $AttributeValue | Should be "Visa"
+            }
         }
-
-        It "Parameters get saved into object (Name, DisplayName, Description)" {
-            Assert-MockCalled New-FimImportObject -ParameterFilter {
-                # To-Do anchor in place of $result[2]
-                $ObjectType -eq "AttributeTypeDescription" -and $State -eq "Put" -and $changes["DisplayName"] -eq "Visum" -and $result[2].Values -eq "Visum"
-            } -ModuleName "IS4U.FimPortal.Schema"
-        }
-
-        It "Variable id gets filled and Update-Attribute returns a Guid" {
-            $result | Should Not BeNullOrEmpty
-            $result[5].GetType() -eq [GUID]
+        It "obj gets filled and should be send to Save-Resource" {
+                $result.DisplayName | Should be "Visa"
+                $result.Description | Should be "Test"
         }
     }
 }
 
 Describe "Remove-Attribute" {
-    Context "With parameter Name" {
-        Mock Remove-FimObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $AnchorName, $AnchorValue, $ObjectType
+    Mock Get-Resource { 
+        $obj = [PSCustomObject]@{
+            ObjectId = @{Value = [Guid]"2527a08a-2158-4bac-96a1-ca0c16400beb"}
         }
+        return $obj
+     } -ModuleName "IS4U.FimPortal.Schema"
+    Mock Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
         Remove-Attribute -Name "Visa"
-
-        It "Correct parameters go to Remove-FimObject" {
-            Assert-MockCalled Remove-FimObject -ParameterFilter {
-                $AnchorName -eq "Name" -and $AnchorValue -eq "Visa" -and $ObjectType -eq "AttributeTypeDescription"
-            } -ModuleName "IS4U.FimPortal.Schema"
+        It "Get-Resource sends correct parameters" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "AttributeTypeDescription"
+                $AttributeName | Should be "Name"
+                $AttributeValue | Should be "Visa"
+            }
+        }
+        It "Remove-Resource gets called With correct parameter" {
+            Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ID -eq "2527a08a-2158-4bac-96a1-ca0c16400beb"
+            }
         }
     }
 }
 
-Describe "New-Binding" { 
-    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $ObjectType, $State, $changes, $ApplyNow, $SkipDuplicateCheck, $PassThru
-    }
-    Context "New-Binding with parameters, testing GUID (without parameters to Get-FimObject)" {
-        Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema"
-        $result = New-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
-        It "AttrId and ObjId gets Id from Get-FimObjectID" {
-            $result[2]["BoundObjectType"].GetType() -eq [GUID] | Should be $true
+Describe "New-Binding" {
+    Mock Get-Resource {New-Guid} -ModuleName "IS4U.FimPortal.Schema"
+    Mock New-Resource {
+        $obj = [PSCustomObject]@{
+            Required = ""
+            DisplayName = "" 
+            Description = ""
+            BoundAttributeType = ""
+            BoundObjectType = ""
+            id = ""
         }
-    }
-
-    Context "New-Binding with parameters aswell to mock to Get-FimObjectId" {
-        Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $ObjectType, $AttributeName, $AttributeValue
+        return $obj
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters (Get-Resource returns a Guid)" {
+        $result = New-Binding -AttributeName "Visa" -DisplayName "Visa Card Number"
+        It "Get-Resource gets called 3 times" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 3
         }
-
-        $result = New-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
-        
-        It "AttrId sends correct parameters (+ test hashtable changes gets filled)" {
-            #return[2]["BoundAttributeType"][0]
-            # ^Changes          ^=           ^ObjectType
-            $result[2]["BoundAttributeType"][0] -eq "AttributeTypeDescription" | Should be $true
-            Write-Host($result[2])
+        It "obj uses correct parameter for New-Resource" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "BindingDescription"
+            }
         }
-
-        It "ObjId sends correct parameters (+ test hashtable changes gets filled)" {
-            $result[2]["BoundObjectType"][0] -eq "ObjectTypeDescription" | Should be $true
+        It "attrId and objId get a Guid from Get-Resource" {
+            $result.BoundAttributeType.GetType() -eq [guid] | Should be $True
+            $result.BoundObjectType.GetType() -eq [guid] | Should be $True
         }
-
-        It "New-Binding returns correct object" {
-            Write-Host($result[2].Values)
-            $result[0] -eq "BindingDescription" -and $result[1] -eq "Create" -and $result[2]["DisplayName"] -eq "Visa card number" | Should be $true
+        It "attrId uses correct parameters for Get-Resource" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "AttributeTypeDescription" -and $AttributeValue -eq "Visa"
+            } -Exactly 1
+        }
+        It "objId uses correct parameters for Get-Resource" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription" -and $AttributeValue -eq "Person"
+            } -Exactly 1
+        }
+        It "obj.id (id) uses correct parameters for Get-Resource" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "BindingDescription" -and $AttributeValue -eq "Visa Card Number"
+            }
         }
     }
 }
 
 Describe "Update-Binding" {
-    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $ObjectType, $State, $anchor, $changes, $ApplyNow
-    }
-    Mock Get-FimObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $Filter, $attrId, $objId
-    }
-    Context "Update-Binding with parameters: testing id's that get returned from mock New-FimObject" {
-        Mock Get-FimObjectID { return "34b7bfae-e636-41d2-8750-acb0a1ea7a35" } -ModuleName "IS4U.FimPortal.Schema"
-        $result = Update-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
-        It "AttrId and ObjId gets Id from filter" {
-            #result[5] = anchor
-            $result[5] | Should be "/BindingDescription[BoundAttributeType='34b7bfae-e636-41d2-8750-acb0a1ea7a35' and BoundObjectType='34b7bfae-e636-41d2-8750-acb0a1ea7a35']"
+    Context "With parameters; Get-Resource returns a guid 3 times and then an object"{
+        <#  In Update-Binding (with Lithnet) the Get-Resource function gets called 4 times and
+            requires 2 different returns (2 mocks would mean that the second mock will be
+            ignored). For this we need a counter that gives a different return after so many calls  #>
+<#
+        $global:mockCounter = 0                 # global variable so that it can be accessed in $mockTest
+        $mockTest = {
+            $global:mockCounter++               # Without global this variable would have not been set
+            if ($mockCounter -lt 3) {           # Get-Resource gets called 4 times (counter starts at 1) 
+                return New-Guid                 # First 2 times Get-Resource returns a New-Guid (testing purposes)
+            } elseif ($mockCounter -eq 3) {     # When counter = 3 Get-Resource returns a PsCustomObject with only ObjectID attribute
+                $obj = [PSCustomObject]@{
+                    ObjectId = @{Value = New-Guid}
+                }
+                return $obj
+            } 
+            else {
+                $obj = [PSCustomObject]@{
+                    Required = ""
+                    DisplayName = ""
+                    Description = ""
+                }
+                return $obj                     # After the 3rd call, Get-Resource returns a PsCustomObject
+            }
         }
-    }
-
-    Context "Update-Binding with parameters: testing variables get filled and returns" {
-        Mock Get-FimObjectID { New-Guid } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $ObjectType, $AttributeName, $AttributeValue
+        #>
+        <# Use -MockWith on Get-Resource without {}, we want to return the return of the variable $mockTest.
+        If {} is used the Mock will give a "variable not set" error. #>
+        Mock Get-Resource {
+            $obj = [PSCustomObject]@{
+                Required = ""
+                DisplayName = ""
+                Description = ""
+                ObjectID = @{Value = [Guid]"111dc7af-bbf3-4d51-b294-c26c874fc8cc"}
+            }
+            return $obj
+        } -ModuleName "IS4U.fimPortal.Schema"# -MockWith $mockTest 
+        $result = Update-Binding -AttributeName "Visa" -DisplayName "Visa Card Number"
+        It "Get-Resource gets called 4 times" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -Exactly 4
         }
-
-        Update-Binding -AttributeName Visa -DisplayName "Visa Card Number" -Required $False -ObjectType Person
-
-        It "AttrId sends correct parameters (+ test hashtable changes gets filled)" {
-            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $ObjectType -eq "AttributeTypeDescription" -and $AttributeName -eq "Name" -and $AttributeValue -eq "Visa"
+        It "Get-Resource uses correct parameters for variable attrId" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "AttributeTypeDescription" -and $AttributeValue -eq "Visa" -and $AttributesToGet -eq "ObjectID"
+                                                                                                ## previously: -eq "ID"
             } -Exactly 1
         }
-
-        It "ObjId sends correct parameters (+ test hashtable changes gets filled)" {
-            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $ObjectType -eq "ObjectTypeDescription" -and $AttributeName -eq "Name" -and $AttributeValue -eq "Person"
+        It "Get-Resource uses correct parameters for variable objId" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription" -and $AttributeValue -eq "Person" -and $AttributesToGet -eq "ObjectID"
             } -Exactly 1
         }
-
-        It "Parameters get saved into object (ObjectID, DisplayName, Description)" {
-            Assert-MockCalled New-FimImportObject -ParameterFilter {
-                # To-Do anchor in place of $result[2]
-                #$ObjectType -eq "BindingDescription" -and $State -eq "Put" -and $changes["DisplayName"] -eq "Visa card number" -and $result[2].Values -eq "Visum"
-                $ObjectType | Should be "BindingDescription"
-                $State | Should be "Put"
-                $anchor | Should BeNullOrEmpty
-                $changes["DisplayName"] | Should be "Visa Card Number"
-                $changes["Description"] | Should BeNullOrEmpty
-
-            } -ModuleName "IS4U.FimPortal.Schema"
+        It "Get-Resource uses correct parameters for variable id" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "BindingDescription" -and $AttributeValuePairs.BoundAttributeType `
+                -eq "111dc7af-bbf3-4d51-b294-c26c874fc8cc" -and $AttributesToGet -eq "ObjectID"
+            } -Exactly 1
+        }
+        It "Get-Resource uses correct parameters for variable obj" {
+            # Not possible to check if a New-Guid return is equal to an existing Guid
+            # So check if the type is the same (should be if a Guid is returned)
+            $result.GetType() -eq [Guid] | Should be $True
         }
     }
 }
-
 Describe "Remove-Binding" {
-    Mock Get-FimObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $Filter, $attrId, $objId
-    }
-    Mock Remove-FimObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $AnchorName, $AnchorValue, $ObjectType
-    }
-
-    Context "Remove-Binding with parameters: testing id's that get returned from mock New-FimObjectId" {
-        Mock Get-FimObjectID { return "34b7bfae-e636-41d2-8750-acb0a1ea7a35" } -ModuleName "IS4U.FimPortal.Schema"
-        $result = Remove-Binding -AttributeName "Visa"
-        It "attrId and ObjId get id from Get-FimObjectId and binding get correct parameters filled" {
-            $result[1] | Should be "/BindingDescription[BoundAttributeType='34b7bfae-e636-41d2-8750-acb0a1ea7a35' and BoundObjectType='34b7bfae-e636-41d2-8750-acb0a1ea7a35']"
+    Mock Get-Resource { 
+        # Fixed Guid gets returned from Get-Resource only to check if variable $ID gets correct variable
+        $obj = [PSCustomObject]@{
+            ObjectID = @{Value = [Guid]"111dc7af-bbf3-4d51-b294-c26c874fc8cc"}
         }
-    }
-
-    Context "Remove-Binding with parameters: testing correct variables get filled and send" {
-        Mock Get-FimObjectID { return New-Guid } -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $ObjectType, $AttributeName, $AttributeValue
-        }
-        Remove-Binding -AttributeName "Visa"
-
-        It "Get-FimObjectId get correct parameters for variables attrId" {
-            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $ObjectType -eq "AttributeTypeDescription" -and $AttributeName -eq "Name" -and $AttributeValue -eq "Visa"
+        return $obj
+     } -ModuleName "IS4U.FimPortal.Schema"
+    Mock Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameter" {
+        Remove-Binding -AttributeName Visa
+        It "Get-Resource uses correct parameters for variable attrId" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "AttributeTypeDescription" -and $AttributeValue -eq "Visa" -and $AttributesToGet -eq "ObjectID"
             } -Exactly 1
         }
-
-        It "Get-FimObjectId get correct parameters for variables objId" {
-            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $ObjectType -eq "ObjectTypeDescription" -and $AttributeName -eq "Name" -and $AttributeValue -eq "Person"
+        It "Get-Resource uses correct parameters for variable objId" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription" -and $AttributeValue -eq "Person" -and $AttributesToGet -eq "ObjectID"
             } -Exactly 1
         }
-
-        It "Remove-FimOject send correct parameters" {
-            Assert-MockCalled Remove-FimObject -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AnchorName -eq "ObjectID" -and $ObjectType -eq "BindingDescription"
-                $AnchorValue | Should be "/BindingDescription[BoundAttributeType='AttributeTypeDescription Name Visa' and BoundObjectType='ObjectTypeDescription Name Person']"
+        It "Get-Resource uses correct parameters for variable id" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "BindingDescription" -and $AttributeValuePairs.BoundAttributeType -and $AttributesToGet -eq "ObjectID"
+            } -Exactly 1
+        }
+        It "Remove-Resource uses correct parameters" {
+            Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ID -eq "111dc7af-bbf3-4d51-b294-c26c874fc8cc"
             }
         }
     }
 }
-
-Describe "New-AttributeAndBinding" {
-    Mock New-Binding -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $AttributeName, $DisplayName, $ObjectType
-    } 
-    
-    Mock Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $AttrName, $MprName
-    }
-
-    Mock Add-AttributeToFilterScope -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $AttributeId, $DisplayName
-    }
-
-    Mock New-Attribute { return New-Guid } -ModuleName "IS4U.FimPortal.Schema"
-
-    Context "With parameters Name, DisplayName and Type to New-AttributeAndBinding" {
-        New-AttributeAndBinding -Name "Visa" -DisplayName "Visa Card Number" -Type String
-        It "New-Attribute sends correct parameters for variable attrId" {
-            Assert-MockCalled New-Attribute -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $Name -eq "Visa" 
-                $DisplayName -eq "Visa Card Number"
-                $Type -eq "String"
-            }
+Describe "Import-SchemaBindings" {
+    Mock New-Binding -ModuleName "IS4U.FimPortal.Schema"
+    Context "With PesterTesting.csv file"{
+        Import-SchemaBindings -CsvFile ".\PesterTesting.csv"
+        It "New-Binding gets called 3 times (3 records in csv)" {
+            Assert-MockCalled New-Binding -ModuleName "IS4U.FimPortal.Schema" -Exactly 3
         }
-
-        It "New-Attribute returns an UniqueIdentifier typ variable to attrId, this gets send with the correct DisplayName to Add-AttributeToFilterScope" {
-            Assert-MockCalled Add-AttributeToFilterScope -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttributeId.GetType() -eq [Microsoft.ResourceManagement.WebServices.UniqueIdentifier]
-                $DisplayName | Should be "Administrator Filter Permission"
-            }
-        }
-
-        It "Add-AttributeToMPR gets called twice" {
-            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa"
-            } -Exactly 2
-        }
-
-        It "Default ObjectType variable (='Person') sends correct parameters to Add-AttributeToMPR first time" {
-            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa" -and $MprName -eq "Administration: Administrators can read and update Users"
+        It "New-Binding uses correct parameters (from first record)" {
+            Assert-MockCalled New-Binding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttributeName -eq "BirthDay" -and $DisplayName -eq "Birth date" -and $ObjectType -eq "Person"
             } -Exactly 1
         }
-
-        It "Default ObjectType variable (='Person') sends correct parameters to Add-AttributeToMPR second time" {
-            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa" -and $MprName -eq "Synchronization: Synchronization account controls users it synchronizes"
-            } -Exactly 1
-        }
-    }
-
-    Context "With parameters Name, DisplayName, Type and ObjectType ('Group') to New-AttributeAndBinding" {
-        New-AttributeAndBinding -Name "Visa" -DisplayName "Visa Card Number" -Type String -ObjectType Group
-        It "Add-AttributeToMPR gets called twice" {
-            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa"
-            } -Exactly 2
-        }
-
-        It "Default ObjectType variable (='Group') sends correct parameters to Add-AttributeToMPR first time" {
-            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa" -and $MprName -eq "Group management: Group administrators can update group resources"
-            } -Exactly 1
-        }
-
-        It "ObjectType variable (='Group') sends correct parameters to Add-AttributeToMPR second time" {
-            Assert-MockCalled Add-AttributeToMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa" -and $MprName -eq "Synchronization: Synchronization account controls group resources it synchronizes"
-            } -Exactly 1
-        }
-    }
-}
-
-Describe "Remove-AttributeAndBinding" {
-    Mock Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $AttrName, $MprName
-    }
-
-    Mock Remove-AttributeFromFilterScope -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $AttributeName, $DisplayName
-    }
-
-    Mock Remove-Binding -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $AttributeName, $ObjectType
-    }
-
-    Mock Remove-Attribute -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-        $Name
-    }
-
-    Context "With parameters Name" {
-        Remove-AttributeAndBinding -Name Visa
-        It "Default objectType calls Remove-AttributeFromMPR two times" {
-            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -Exactly 2
-        }
-
-        It "Remove-AttributeFromMpr gets correct parameters first call" {
-            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa" -and $MprName -eq "Administration: Administrators can read and update Users"
-            } -Exactly 1
-        }
-
-        It "Remove-AttributeFromMpr gets correct parameters second call" {
-            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttrName -eq "Visa" -and $MprName -eq "Synchronization: Synchronization account controls users it synchronizes"
-            } -Exactly 1
-        }
-
-        It "Remove-AttributeFromFilterScope sends correct parameters" {
-            Assert-MockCalled Remove-AttributeFromFilterScope -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttributeName -eq "Visa" -and $DisplayName -eq "Administrator Filter Permission"
-            }
-        }
-
-        It "Remove-Binding sends correct parameters" {
-            Assert-MockCalled Remove-Binding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttributeName -eq "Visa" -and $ObjectType -eq "Person"
-            }
-        }
-
-        It "Remove-Attribute sends correct parameters" {
-            Assert-MockCalled Remove-Attribute -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $Name -eq "Visa"
-            }
-        }
-    }
-
-    Context "With parameters Name and ObjectType ('Group')" {
-        Remove-AttributeAndBinding -Name "Visa" -ObjectType "Group"
-        It "Remove-AttributeFromMPR gets called 0 times" {
-            Assert-MockCalled Remove-AttributeFromMPR -ModuleName "IS4U.FimPortal.Schema" -Exactly 0
-        }
-
-        It "Remove-Binding send correct parameters" {
-            Assert-MockCalled Remove-Binding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AttributeName -eq "Visa" -and $ObjectType -eq "Group"
-            }
-        }
-    }
-}
-
-Describe "Import-SchemaAttributesAndBindings and Import-SchemaBindings" {
-    Mock New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema"
-    Context "With PesterTesting.csv file" {
-        Import-SchemaAttributesAndBindings -CsvFile ".\PesterTesting.csv"
-        It "New-AttributeAndBinding gets called 3 times (3 records in Csv)" {
-            Assert-MockCalled New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema" -Exactly 3
-        }
-
-        It "New-AttributeAndBinding gets correct parameters (from first record)" {
-            Assert-MockCalled New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $Name -eq "Birthday" -and $DisplayName -eq "Birth date" -and $Type -eq "DateTime" -and $Multivalued -eq "false" -and $ObjectType -eq "Person"
-            } -Exactly 1
-        }
-
-        It "New-AttributeAndBinding gets correct parameters (from third record)" {
-            Assert-MockCalled New-AttributeAndBinding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $Name -eq "RoleDistributionList" -and $DisplayName -eq "Role gets a distribution list" -and $Type -eq "Boolean" -and $Multivalued -eq "false" -and $ObjectType -eq "Group"
+        It "New-Binding uses correct parameters (from third record)" {
+            Assert-MockCalled New-Binding -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $AttributeName -eq "RoleDistributionList" -and $DisplayName -eq "Role gets a distribution list" -and $ObjectType -eq "Group"
             } -Exactly 1
         }
     }
 }
 
 Describe "New-ObjectType" {
-    Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
-
-    Mock Get-FimObjectID { return New-Guid } -ModuleName "IS4U.FimPortal.Schema"
-
+    Mock New-Resource {
+        [PSCustomObject]@{
+            Name = ""
+            DisplayName = ""
+            Description = ""
+        }
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Mock Get-Resource { 
+        $obj = [PSCustomObject]@{
+            ObjectId = @{Value = "111dc7af-bbf3-4d51-b294-c26c874fc8cc"}
+        }
+        return $obj
+     } -ModuleName "IS4U.FimPortal.Schema"
     Context "With parameters" {
-        $result = New-ObjectType -Name "Department" -DisplayName "Department" -Description "Department"
-
-        It "New-FimImportObject gets correct parameters" {
-            Assert-MockCalled New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+        $result = New-ObjectType -Name Department -DisplayName Departmen -Description Depart
+        It "New-Resource uses correct parameters for variable obj" {
+            Assert-MockCalled New-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
                 $ObjectType -eq "ObjectTypeDescription"
-                $State | Should be "Create" 
-                $Changes["DisplayName"] | Should be "Department" 
-                $Changes["Name"] | Should be "Department" 
-                $Changes["Description"] | Should be "Department"
             }
         }
-        
-        It "Get-FimObjectId gets correct parameters" {
-            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+        It "Get-Resource uses correct parameters for variable obj" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
                 $ObjectType -eq "ObjectTypeDescription"
                 $AttributeName | Should be "Name"
                 $AttributeValue | Should be "Department"
+                $AttributesToGet | Should be "ObjectID"     ##Previously ID
             }
         }
-
-        It "Get-FimObjectID returns a GUID" {
-            $result.GetType() -eq [guid] |Should be $true
+        It "New-ObjectType returns a GUID" {
+            $result | Should be "111dc7af-bbf3-4d51-b294-c26c874fc8cc"
         }
     }
 }
 
 Describe "Update-ObjectType" {
-
-    Mock Get-FimObjectID { return New-Guid } -ModuleName "IS4U.FimPortal.Schema"
-
-    Context "With parameters, Get-FimObjectId returns a GUID" {
-        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema"
-        $result = Update-ObjectType -Name "Department" -DisplayName "Department" -Description "Department"
-
-        It "New-FimImportObject gets correct parameters" {
-            Assert-MockCalled New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $ObjectType -eq "ObjectTypeDescription"
-                $State | Should be "Put" 
-                #$Anchor["Name"] | Should be "Department" null array
-                $Changes["DisplayName"] | Should be "Department" 
-                $Changes["Description"] | Should be "Department"
-            }
+    Mock Get-Resource {
+        $obj = [PSCustomObject]@{
+            Name = ""
+            DisplayName = ""
+            Description = ""
+            ObjectID = @{Value = "111dc7af-bbf3-4d51-b294-c26c874fc8cc"}
         }
-        
-        It "Get-FimObjectId gets correct parameters" {
-            Assert-MockCalled Get-FimObjectID -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+        return $obj
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameters" {
+        $result = Update-ObjectType -Name Department -DisplayName Departme -Description Department
+        It "Get-Resource uses correct parameters for variable obj" {
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
                 $ObjectType -eq "ObjectTypeDescription"
                 $AttributeName | Should be "Name"
-                $AttributeValue | Should be "Department"
-            }
+                $AttributeValue | Should be "department"
+            } -Exactly 1    #-Exactly 1 to be sure it only gets called once with these parameters
         }
-
-        It "Get-FimObjectID returns a GUID" {
-            $result.GetType() -eq [guid] |Should be $true
-        }
-    }
-    Context "With parameters, Get-FimObjectId returns its parameters" {
-        Mock New-FimImportObject -ModuleName "IS4U.FimPortal.Schema" -MockWith {
-            $ObjectType, $State, $Anchor, $Changes, $ApplyNow
-        }
-        $result = Update-ObjectType -Name "Department" -DisplayName "Department" -Description "Department"
-        #anchor = result[2]
-        It "Coorect variable Anchor gets send" {
-            $result[2]["Name"] | Should be "Department"
+        It "Update-ObjectType returns a GUID" {
+            $result | Should be "111dc7af-bbf3-4d51-b294-c26c874fc8cc"
         }
     }
 }
 
 Describe "Remove-ObjectType" {
-    Mock Remove-FimObject -ModuleName "IS4U.FimPortal.Schema"
-    Context "With parameters" {
-        Remove-ObjectType -Name "Department"
-        It "Remove-FimObject get correct parameters" {
-            Assert-MockCalled Remove-FimObject -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
-                $AnchorName -eq "Name" -and $ObjectType -eq "ObjectTypeDescription"
-                $AnchorValue | Should be "Department"
+    Mock Get-Resource {
+        $obj = [PSCustomObject]@{
+            ObjectID = @{Value = "111dc7af-bbf3-4d51-b294-c26c874fc8cc"}
+        }
+        return $obj
+    } -ModuleName "IS4U.FimPortal.Schema"
+    Mock Remove-Resource -ModuleName "IS4U.FimPortal.Schema"
+    Context "With parameter" {
+        It "Get-Resource uses the correct parameters" {
+            Remove-ObjectType -Name Department
+            Assert-MockCalled Get-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ObjectType -eq "ObjectTypeDescription"
+                $AttributeName | Should be "Name"
+                $AttributeValue | Should be "Department"
+            }
+        }
+        It "Remove-Resource gets called with correct parameters" {
+            Assert-MockCalled Remove-Resource -ModuleName "IS4U.FimPortal.Schema" -ParameterFilter {
+                $ID -eq "111dc7af-bbf3-4d51-b294-c26c874fc8cc"
             }
         }
     }
 }
-
-#Set-ExecutionPolicy -Scope process Unrestricted
+#Set-ExecutionPolicy -Scope Process Unrestricted

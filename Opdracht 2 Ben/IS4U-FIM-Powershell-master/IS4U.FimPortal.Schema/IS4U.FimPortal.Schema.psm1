@@ -136,7 +136,6 @@ Function Update-Person {
 	 .EXAMPLE
 	Update-Person -DisplayName MSamson -Address "New street" -City Antwerp
 	#>
-#[cmdletBinding()]
 param (
 	[Parameter(Mandatory=$False)]
 	[String]
@@ -325,7 +324,6 @@ Function Remove-Attribute {
 		[String]
 		$Name
 	)
-	## When testing pipelining will not work
 	#Get-Resource -ObjectType AttributeTypeDescription -AttributeName Name -AttributeValue $Name | Remove-Resource
 
 	# Use the ObjectID of the object to remove the correct resource

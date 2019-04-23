@@ -56,7 +56,7 @@ Function Start-Migration {
     To ensure the differences get imported in the target MIM-Setup, call 'Start-Migration -ImportDelta'.
     This will use the created ConfigurationDelta.xml (from the chosen configurations) with Start-FimDelta (FimDelta.exe).
     If the user wishes to not import all resources and saves the selected resources, a ConfigurationDelta2.xml file will be
-    created. The ConfigurationDelta.xml or ConfigurationDelta2.xml then gets imported in the target MIM-Setup.
+    created. The ConfigurationDelta.xml or ConfigurationDelta2.xml then gets imported in the target MIM-Setup
 
     .Parameter PathForDelta
     Optional parameter to declare a path where the ConfigurationDelta(2).xml will be saved. If this parameter is not declared
@@ -297,7 +297,7 @@ Function Export-MIMSetup {
         }
     }
     Write-Host "Export saved to $PathToConfig!" -ForegroundColor Green
-    Remove-Variable Path -Scope global
+    Remove-Variable PathToConfig -Scope global
 }
 
 Function Start-FimDelta {
@@ -722,7 +722,7 @@ Function Get-ObjectsFromXml {
 Function Compare-MimObjects {
     <#
     .SYNOPSIS
-    Compares two arrays of MIM-object type resources and sends the differences to Write-ToXmlFile.
+    Compares two arrays of MIM-object type resources and sends the differences to Write-ToXmlFile
     
     .DESCRIPTION
     Compares two arrays containing resources from the source and target MIM-Setup. The objects that are referenced by objects that

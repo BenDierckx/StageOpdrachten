@@ -304,7 +304,7 @@ Function Export-MIMSetup {
         Get-PortalConfig
     }
     Write-Host "Export saved towards $PathToConfig!" -ForegroundColor Green
-    Remove-Variable path -Scope Global
+    Remove-Variable PathToConfig -Scope Global
 }
 
 Function Start-FimDelta {
@@ -896,7 +896,7 @@ Function Compare-Objects {
             $obj.ObjectID = $OriginId
         }
     }
-    if ($difference -or $Objs) {
+    if ($difference -or $newObjs) {
         Write-Host "Differences found!" -ForegroundColor Yellow
         Write-Host "Found $NewObjCounter new $Type objects." -ForegroundColor Yellow
         Write-Host "Found $DifferenceCounter different $Type objects." -ForegroundColor Yellow
@@ -951,7 +951,7 @@ Function Write-ToXmlFile {
         [Array]
         $Anchor,
 
-        [Parameter(Mandatory=$True)]
+        [Parameter(Mandatory=$False)]
         [Switch]
         $newObjects
     )

@@ -715,7 +715,7 @@ Function Update-Set {
 	$resource.Filter = $filter
 	$resource.Description = $Description
 	Save-Resource $resource
-	return $resource.ObjcetID.Value
+	return $resource.ObjectID.Value
 	<#
 	$anchor = @{'DisplayName' = $DisplayName}
 	$filter = Get-Filter $Condition

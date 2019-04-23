@@ -50,26 +50,17 @@ Import-Module IS4U.FimPortal.Migrate.Json
 }#>
 
 Describe "Export-MIMSetup export"{
+    Mock Export-MIMSetup -ModuleName IS4U.FimPortal.Migrate.Json
     Mock Get-SchemaConfig -ModuleName IS4U.FimPortal.Migrate.Json
     Mock Get-PortalConfig -ModuleName IS4U.FimPortal.Migrate.Json
     Mock Get-PolicyConfig -ModuleName IS4U.FimPortal.Migrate.Json
     Mock Write-Host -ModuleName "IS4U.FimPortal.Migrate.Json"
-    context "With parameter ExportMIM and user chooses 'y'"{
-        Mock Read-Host {return "y"} -ModuleName "IS4U.FimPortal.Migrate.Json"
-        Export-MIMSetup
-        it "Start Migration calls correct functions when ExportMIM param is True" {
+    context "With -ExportAll Switch"{
+        Export-MIMSetup -ExportAll -PathToExport "C:/"
+        it "All export functions are called" {
             Assert-MockCalled Get-PolicyConfig -ModuleName "IS4U.FimPortal.Migrate.Json"
             Assert-MockCalled Get-SchemaConfig -ModuleName "IS4U.FimPortal.Migrate.Json"
             Assert-MockCalled Get-PortalConfig -ModuleName "IS4U.FimPortal.Migrate.Json"
-        }
-    }
-    Context "With parameter ExportMIM and user chooses 'n'"{
-        Mock Read-Host {return "n"} -ModuleName "IS4U.FimPortal.Migrate.Json"
-        Export-MIMSetup
-        it "Start-Migration will not export when user chooses 'n'" {
-            Assert-MockCalled Get-PolicyConfig -ModuleName "IS4U.FimPortal.Migrate.Json" -Exactly 0
-            Assert-MockCalled Get-SchemaConfig -ModuleName "IS4U.FimPortal.Migrate.Json" -Exactly 0
-            Assert-MockCalled Get-PortalConfig -ModuleName "IS4U.FimPortal.Migrate.Json" -Exactly 0
         }
     }
 }
@@ -84,11 +75,14 @@ Describe "Start-Migration import" {
     } -ModuleName "IS4U.FimPortal.Migrate.Json"
     Mock Start-Process -ModuleName "IS4U.FimPortal.Migrate.Json"
     Mock Write-Host -ModuleName "IS4U.FimPortal.Migrate.Json"
-    context "No parameters"{
-        Start-Migration -All
+    Mock Test-Path -ModuleName "IS4U.FimPortal.Migrate.Json" {
+        return $True
+    }
+    context "With parameter All"{
+        Start-Migration -All -PathToConfigFiles "./testPath"
         it "Correct path gets send"{
             Assert-MockCalled Compare-Schema -ParameterFilter {
-                $Path -eq "./testPath"
+                $path -eq "./testPath"
             } -ModuleName "IS4U.FimPortal.Migrate.Json"
         }
         it "All compares get called once" {

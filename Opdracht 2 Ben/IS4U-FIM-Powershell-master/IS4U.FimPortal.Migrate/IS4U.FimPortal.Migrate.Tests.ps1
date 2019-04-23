@@ -1,66 +1,67 @@
-Import-Module IS4U.Migrate
-# Navigate to the "/IS4U.Migrate" folder
-# Start tests with PS> Invoke-Pester 
-Describe "Export-MIMSetupToXml"{
-    Mock Get-SchemaConfigToXml -ModuleName IS4U.Migrate
-    Mock Get-PortalConfigToXml -ModuleName IS4U.Migrate
-    Mock Get-PolicyConfigToXml -ModuleName IS4U.Migrate
-    Mock Write-Host -ModuleName "IS4U.Migrate"
-    context "With user chooses 'y'"{
-        Mock Read-Host {return "y"} -ModuleName "IS4U.Migrate"
-        Export-MIMSetupToXml
-        it "Start Migration calls correct functions when ExportMIMToXml param is True" {
-            Assert-MockCalled Get-PolicyConfigToXml -ModuleName "IS4U.Migrate"
-            Assert-MockCalled Get-SchemaConfigToXml -ModuleName "IS4U.Migrate"
-            Assert-MockCalled Get-PortalConfigToXml -ModuleName "IS4U.Migrate"
-        }
-    }
-    Context "With user chooses 'n'"{
-        Mock Read-Host {return "n"} -ModuleName "IS4U.Migrate"
-        Export-MIMSetupToXml
-        it "Start-Migration will not export when user chooses 'n'" {
-            Assert-MockCalled Get-PolicyConfigToXml -ModuleName "IS4U.Migrate" -Exactly 0
-            Assert-MockCalled Get-SchemaConfigToXml -ModuleName "IS4U.Migrate" -Exactly 0
-            Assert-MockCalled Get-PortalConfigToXml -ModuleName "IS4U.Migrate" -Exactly 0
+Import-Module IS4U.FimPortal.Migrate
+# Navigate to the "/IS4U.FimPortal.Migrate" folder
+# Start tests with: PS > Invoke-Pester 
+Describe "Export-MIMSetup"{
+    Mock Get-SchemaConfig -ModuleName IS4U.FimPortal.Migrate
+    Mock Get-PortalConfig -ModuleName IS4U.FimPortal.Migrate
+    Mock Get-PolicyConfig -ModuleName IS4U.FimPortal.Migrate
+    Mock Write-Host -ModuleName "IS4U.FimPortal.Migrate"
+    context "With -ExportAll switch"{
+        Export-MIMSetup -ExportAll -PathForExport "C:\"
+        it "All export functions are called" {
+            Assert-MockCalled Get-PolicyConfig -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
+            Assert-MockCalled Get-SchemaConfig -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
+            Assert-MockCalled Get-PortalConfig -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
         }
     }
 }
 
 Describe "Start-Migration import" {
-    Mock Compare-Schema -ModuleName "IS4U.Migrate"
-    Mock Compare-Policy -ModuleName "IS4U.Migrate"
-    Mock Compare-Portal -ModuleName "IS4U.Migrate"
-    Mock Import-Delta -ModuleName "IS4U.Migrate"
+    Mock Compare-Schema -ModuleName "IS4U.FimPortal.Migrate"
+    Mock Compare-Policy -ModuleName "IS4U.FimPortal.Migrate"
+    Mock Compare-Portal -ModuleName "IS4U.FimPortal.Migrate"
+    Mock Import-Delta -ModuleName "IS4U.FimPortal.Migrate"
     Mock Select-FolderDialog {
         return "./testPath"
-    } -ModuleName "IS4U.Migrate"
-    Mock Start-Process -ModuleName "IS4U.Migrate"
-    Mock Write-Host -ModuleName "IS4U.Migrate"
+    } -ModuleName "IS4U.FimPortal.Migrate"
+    Mock Start-Process -ModuleName "IS4U.FimPortal.Migrate"
+    Mock Write-Host -ModuleName "IS4U.FimPortal.Migrate"
+    Mock Test-Path -ModuleName "IS4U.FimPortal.Migrate" {
+        return $True
+    }
     context "With parameter All"{
-        Start-Migration -All
+        Start-Migration -All -PathToConfig "./testPath"
         it "Correct path gets send"{
             Assert-MockCalled Compare-Schema -ParameterFilter {
                 $Path -eq "./testPath"
-            } -ModuleName "IS4U.Migrate"
+            } -ModuleName "IS4U.FimPortal.Migrate"
         }
         it "All compares get called once" {
-            Assert-MockCalled Compare-Schema -ModuleName "IS4U.Migrate" -Exactly 1
-            Assert-MockCalled Compare-Portal -ModuleName "IS4U.Migrate" -Exactly 1
-            Assert-MockCalled Compare-Policy -ModuleName "IS4U.Migrate" -Exactly 1
+            Assert-MockCalled Compare-Schema -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
+            Assert-MockCalled Compare-Portal -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
+            Assert-MockCalled Compare-Policy -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
         }
     }
     context "With parameter CompareSchema" {
         Start-Migration -CompareSchema
         it "Only Compare-Schema gets called" {
-            Assert-MockCalled Compare-Schema -ModuleName "IS4U.Migrate" -Exactly 1
-            Assert-MockCalled Compare-Portal -ModuleName "IS4U.Migrate" -Exactly 0
-            Assert-MockCalled Compare-Policy -ModuleName "IS4U.Migrate" -Exactly 0
+            Assert-MockCalled Compare-Schema -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
+            Assert-MockCalled Compare-Portal -ModuleName "IS4U.FimPortal.Migrate" -Exactly 0
+            Assert-MockCalled Compare-Policy -ModuleName "IS4U.FimPortal.Migrate" -Exactly 0
+        }
+    }
+    context "With parameter ComparePortal" {
+        Start-Migration -ComparePortal
+        it "Only Compare-Portal gets called" {
+            Assert-MockCalled Compare-Schema -ModuleName "IS4U.FimPortal.Migrate" -Exactly 0
+            Assert-MockCalled Compare-Portal -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1
+            Assert-MockCalled Compare-Policy -ModuleName "IS4U.FimPortal.Migrate" -Exactly 0
         }
     }
 }
 
 Describe "Compare-MimObjects" {
-    Mock Write-ToXmlFile -ModuleName "IS4U.Migrate"
+    Mock Write-ToXmlFile -ModuleName "IS4U.FimPortal.Migrate"
     Context "No differences in objects" {
         $objs1 = @(
             [PSCustomObject]@{
@@ -103,7 +104,7 @@ Describe "Compare-MimObjects" {
         $global:bindings = @()
         Compare-MimObjects -ObjsSource $objs1 -ObjsDestination $objs2 -path "./testPath"
         It "No differences should be found" {
-            Assert-MockCalled Write-ToXmlFile -ModuleName "IS4U.Migrate" -Exactly 0
+            Assert-MockCalled Write-ToXmlFile -ModuleName "IS4U.FimPortal.Migrate" -Exactly 0
         }
     }
 
@@ -146,10 +147,9 @@ Describe "Compare-MimObjects" {
                 BoundObjectType = "456"
             }
         )
-        Mock Write-Host -ModuleName "IS4U.Migrate"
         Compare-MimObjects -ObjsSource $objs1 -ObjsDestination $objs2 -path "./testPath"
         It "Differences should be found and Write-ToXmlFile is called with correct differences" {
-            Assert-MockCalled Write-ToXmlFile -ModuleName "IS4U.Migrate" -Exactly 1 -ParameterFilter {
+            Assert-MockCalled Write-ToXmlFile -ModuleName "IS4U.FimPortal.Migrate" -Exactly 1 -ParameterFilter {
                 $DifferenceObjects[0].Name -eq "At"
                 $DifferenceObjects[0].ObjectID | Should be "555"
                 $DifferenceObjects[1].Name | Should be "ObjTest"

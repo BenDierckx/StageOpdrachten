@@ -1,5 +1,5 @@
 #
-# Module manifest for module 'IS4U.FimPortal'
+# Module manifest for module 'IS4U.FimPortal.Migrate'
 #
 
 @{
@@ -35,7 +35,7 @@
     here: http://opensource.org/licenses/gpl-3.0.'
     
     # Description of the functionality provided by this module
-    # Description = ''
+    Description = 'Exporting resources from a MIM-Setup and importing a delta configuration in a target MIM-Setup'
     
     # Minimum version of the Windows PowerShell engine required by this module
     # PowerShellVersion = ''
@@ -126,6 +126,4 @@
     # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
     # DefaultCommandPrefix = ''
     
-    }
-    
-    
+}
